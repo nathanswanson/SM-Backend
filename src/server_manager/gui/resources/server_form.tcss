@@ -1,0 +1,90 @@
+ServerForm {
+    align: center middle;
+}
+
+#serverdialog {
+    layout: grid;
+    grid-gutter: 1;
+    grid-columns: 1fr;
+    grid-rows: 1fr;
+    grid-size: 4 5;
+    align-horizontal: center;
+    width: 80;
+    height: 30;
+    background: $surface;
+    border: thick $background 80%;
+}
+
+#server_name_label {
+    padding: 1 2;
+    text-align: center;
+    column-span: 1;
+    row-span: 1;
+}
+
+#server_name_input {
+    height: 3;
+    margin: 0;
+    width: 1fr;
+    column-span: 2;
+    row-span: 1;
+}
+
+#server_dynamic_box {
+    text-align: center;
+    column-span: 4;
+    row-span: 1;
+}
+
+#server_dynamic_box_expanded {
+    column-span: 4;
+    row-span: 3;
+    text-align: center;
+    height: 20;
+    border: round red;
+    layout: grid;
+    grid-size: 4;
+}
+
+.server_dynamic_box_entry {
+    margin: 0;
+    padding: 0;
+    margin: 0;
+    column-span: 2;
+    row-span: 1;
+    height: auto;
+    border: round blue;
+}
+
+.server_dynamic_box_entry_label {
+    padding: 1 2;
+    text-align: center;
+    row-span: 1;
+    column-span: 1;
+}
+
+.server_dynamic_box_entry_input {
+    row-span: 1;
+    column-span: 1;
+    width: 1fr;
+    height: auto;
+}
+
+#apply_server_name {
+    row-span: 1;
+    align-horizontal: center;
+    column-span: 1;
+}
+
+#create_server_button {
+    row-span: 1;
+    align-horizontal: center;
+    column-span: 2;
+}
+
+#cancel_button {
+    row-span: 1;
+    align-horizontal: center;
+    column-span: 2;
+}
+

@@ -1,0 +1,28 @@
+[build-system]
+requires = ["hatchling>=1.24"]
+build-backend = "hatchling.build"
+
+[project]
+name = "server-manager"
+dynamic = ["version"]
+description = "Server Manager"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{ name = "NS", email = "nathanswanson370@gmail.com" }]
+
+[project.urls]
+Homepage = "https://example.com/server-manager"
+
+# Read version from src/server_manager/__about__.py -> __version__
+[tool.hatch.version]
+path = "src/server_manager/__about__.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/server_manager"]
+
+[tool.hatch.envs.default]
+python = "3.12"
+
+[tool.hatch.envs.hatch-static-analysis]
+dependencies = ["ruff>=0.12.8"]
+config-path = "ruff.toml"

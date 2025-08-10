@@ -1,0 +1,48 @@
+ConfirmationPrompt {
+    align: center middle;
+}
+
+#confirmation_prompt_content {
+    layout: grid;
+    grid-gutter: 1;
+    grid-columns: 1fr;
+    grid-rows: 1fr;
+    grid-size: 2 4;
+    align-horizontal: center;
+    width: 60;
+    height: 30;
+    background: $surface;
+    border: thick $background 80%;
+}
+
+#confirmation_message {
+    padding: 1 2;
+    text-align: center;
+    column-span: 2;
+    row-span: 1;
+}
+
+#confirmation_submessage {
+    padding: 1 2;
+    text-align: center;
+    column-span: 2;
+    row-span: 1;
+}
+
+#container_name_input {
+    height: 3;
+    margin: 0;
+    width: 1fr;
+    column-span: 2;
+    row-span: 1;
+}
+
+#confirm_button {
+    row-span: 1;
+    column-span: 1;
+}
+
+#cancel_button {
+    row-span: 1;
+    column-span: 1;
+}
