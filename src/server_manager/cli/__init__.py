@@ -9,7 +9,7 @@ from rich.console import Console
 
 from server_manager.__about__ import __version__
 from server_manager.common.api.docker_container_api import (
-    docker_list_containers,
+    docker_list_containers_names,
     docker_remove_container,
     docker_stop_container,
 )
@@ -167,7 +167,7 @@ def list_resources(choice: str):
     if choice == "images":
         console.print(docker_list_images())
     elif choice == "containers":
-        console.print(docker_list_containers())
+        console.print(docker_list_containers_names())
     elif choice == "templates":
         console.print(TemplateManager().get_templates())
 

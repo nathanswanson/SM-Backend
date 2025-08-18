@@ -1,51 +1,22 @@
 from __future__ import annotations
 
 import asyncio
-import logging
-import sys
-from typing import TYPE_CHECKING, Any, ClassVar
+import threading
+from typing import ClassVar
 
-import docker.errors
 from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Button, DataTable, Footer, Header, Label, RichLog, Sparkline
+from textual.widgets import Button, DataTable, Footer, Header, RichLog, Sparkline
 
-from server_manager.common.api.docker_container_api import docker
 from server_manager.common.api.docker_image_api import docker_image_spawn_container
+from server_manager.common.container_data import ContainerData
 from server_manager.common.template import TemplateManager
-from server_manager.gui.widgets.confirmation_prompt import ConfirmationPrompt
 from server_manager.gui.widgets.server_form import ServerForm
-
-if TYPE_CHECKING:
-    from docker.models.containers import Container
-
-
-class RichLogWriter:
-    def __init__(self, rich_log):
-        self.rich_log = rich_log
-
-    def write(self, message):
-        if message.strip():
-            self.rich_log.write(message.rstrip())
-
-    def flush(self):
-        pass  # Needed for compatibility
 
 
 class MyWindow(App):
     TITLE = "Server Manager"
-    container_logs: dict[str, RichLog]
-    container_log_tasks: dict[str, asyncio.Task]
-
-    active_servers_table: DataTable
-    selected_server: str = ""
-    server_was_selected_event: asyncio.Event
-    containers: list
-
-    image_name_to_id: dict[str, str]
-    image_id_to_name: dict[str, str]
-
     BINDINGS: ClassVar = [("q", "quit", "Quit the application")]
     CSS_PATH: ClassVar = [
         "resources/main.tcss",
@@ -53,67 +24,49 @@ class MyWindow(App):
         "resources/confirmation_prompt.tcss",
     ]
 
-    # plot data
-    plots: dict[str, Sparkline]
-    plot_data_window_size = 100
-    plot_data: dict[str, list[float]]
+    server_table: DataTable
+    servers: dict[str, ContainerData]
+    _selected_server_key: str | None
+    plots: list[Sparkline]
+    log_widget: RichLog
+    log_thread_obj: threading.Thread
 
-    def __init__(self, docker_client):
-        self.server_was_selected_event = asyncio.Event()
-        self.image_id_to_name = {}
-        self.image_name_to_id = {}
-        self.container_log_tasks = {}
-        self.plot_data = {
-            "server_memory_usage": [0] * self.plot_data_window_size,
-            "server_network_usage": [0] * self.plot_data_window_size,
-            "server_cpu_usage": [0] * self.plot_data_window_size,
-            "server_storage_usage": [0] * self.plot_data_window_size,
-        }
-        self.plots = {
-            "server_memory_usage": Sparkline(id="server_memory_usage"),
-            "server_network_usage": Sparkline(id="server_network_usage"),
-            "server_cpu_usage": Sparkline(id="server_cpu_usage"),
-            "server_storage_usage": Sparkline(id="server_storage_usage"),
-        }
-        self.client = docker_client
-        self.fields: dict[str, str] = {}
-        self.active_servers_table = DataTable(show_header=True, cursor_type="row")
-        self.update_container_data()
-        self.update_image_data()
-        sys.stdout = RichLogWriter(self.container_logs[self.selected_server])
-        sys.stderr = RichLogWriter(self.container_logs[self.selected_server])
+    def __init__(self):
+        self.log_thread_obj = threading.Thread(target=self.log_thread, daemon=True)
+        self.log_widget = RichLog()
+        self.log_widget.styles.width = "0.5fr"
+        self.servers = {container.name: container for container in ContainerData.get_all_containers()}
+        self.server_table = DataTable(cursor_type="row")
+        self.plots = [Sparkline(), Sparkline(), Sparkline()]
+        self._selected_server_key = None
         super().__init__()
 
+    async def poll_active_server(self) -> None:
+        while True:
+            for server in self.servers.values():
+                await server.metrics_task()
+            await asyncio.sleep(5)
+
     def on_mount(self) -> None:
-        self.run_worker(self.manager_task())
-        self.run_worker(self.collect_stats())
-        self.run_worker(self.update_graphs())
+        pass
 
-    def update_container_data(self):
-        self.container_logs = {
-            container.name: RichLog(
-                id=container.name, max_lines=100, classes="logs_panel"
-            )
-            for container in self.client.containers.list()
-        }
-        self.container_logs.update(
-            {"": RichLog(id="default_log", classes="logs_panel", max_lines=100)}
-        )
-        self.containers = list(self.client.containers.list())
-
-    def update_image_data(self):
-        self.image_id_to_name = self.get_server_names()
-        self.image_name_to_id = {v: k for k, v in self.image_id_to_name.items()}
+    @property
+    def selected_server(self) -> ContainerData | None:
+        if self._selected_server_key is None:
+            return None
+        return self.servers.get(self._selected_server_key)
 
     def compose(self) -> ComposeResult:
-        if len(self.active_servers_table.columns) == 0:
-            self.active_servers_table.add_column("Server Name", width=20)
-            self.active_servers_table.add_column("Status", width=10)
-            self.active_servers_table.add_column("Uptime", width=10)
-            self.active_servers_table.add_column("CPU", width=10)
-            self.active_servers_table.add_column("Memory", width=10)
-            self.active_servers_table.add_column("Network", width=10)
-            self.active_servers_table.add_column("Storage", width=10)
+        if len(self.server_table.columns) == 0:
+            self.server_table.add_column("Server Name", key="server_name", width=20)
+            self.server_table.add_column("Status", key="status", width=10)
+            self.server_table.add_column("Uptime", key="uptime", width=10)
+            self.server_table.add_column("CPU", key="cpu", width=10)
+            self.server_table.add_column("Memory", key="memory", width=10)
+            self.server_table.add_column("Network ▲", key="network_up", width=10)
+            self.server_table.add_column("Network ▼", key="network_down", width=10)
+            self.server_table.add_column("Storage ▲", key="storage_up", width=10)
+            self.server_table.add_column("Storage ▼", key="storage_down", width=10)
         yield Header()
         with Horizontal():
             with Vertical(classes="control_panel"):
@@ -128,165 +81,100 @@ class MyWindow(App):
                         id="delete_server",
                         classes="control_panel_button",
                     )
-                    yield Button(
-                        "Debug Log", id="debug_log", classes="control_panel_button"
-                    )
-                yield self.active_servers_table
-            with Vertical(classes="metrics_panel"):
-                for plot in self.plots.values():
-                    if plot.id is not None:
-                        yield Label(
-                            plot.id.replace("_", " ").title(), classes="plot_label"
-                        )
-                    yield plot
-            yield self.container_logs[self.selected_server]
+                    yield Button("Debug Log", id="debug_log", classes="control_panel_button")
+                    yield Button("Stop Selected Server", id="stop_server", classes="control_panel_button")
+                    yield Button("Start Selected Server", id="start_server", classes="control_panel_button")
+                yield self.server_table
+            yield self.log_widget
         yield Footer()
+        self.run_worker(self.poll_active_server)
+        self.run_worker(self.monitor_servers)
+        for server_name in self.servers:
+            self.create_row(server_name)
 
-    def id_to_name(self, server_id: str) -> str:
-        ret = server_id
-        ret = ret.split("/")[-1]
-        return ret.split(":")[0]
+    @on(Button.Pressed, "#create_server")
+    async def create_server(self) -> None:
+        self.push_screen(ServerForm(TemplateManager().get_templates()), callback=self.on_server_created)
 
-    def get_server_names(self) -> dict[str, str]:
-        for image in self.client.images.list():
-            self.image_id_to_name[image.tags[0]] = self.id_to_name(image.tags[0])
-        return self.image_id_to_name
+    @on(Button.Pressed, "#stop_server")
+    async def stop_server(self) -> None:
+        if self.selected_server:
+            self.selected_server.container.stop()
 
-    def confirmation_callback(self, container_name: Any):
-        if container_name is not None:
-            container = self.client.containers.get(container_name)
-            if container:
-                try:
-                    container.stop()
-                    container.remove()
-                    self.log(f"Container {container_name} stopped and removed.")
-                except docker.errors.APIError as e:
-                    self.log(f"Error stopping/removing container {container_name}: {e}")
-            self.refresh_container_table()
+    @on(Button.Pressed, "#start_server")
+    async def start_server(self) -> None:
+        if self.selected_server:
+            self.selected_server.container.start()
 
-    @on(Button.Pressed, ".control_panel_button")
-    def button_callback(self, event: Button.Pressed):
-        if event.button.id == "create_server":
-            self.push_screen(
-                ServerForm(TemplateManager().get_templates()),
-                callback=self.server_form_callback,
-            )
-        elif event.button.id == "delete_server":
-            if self.selected_server != "":
-                self.push_screen(
-                    ConfirmationPrompt(self.selected_server),
-                    callback=self.confirmation_callback,
-                )
-        elif event.button.id == "debug_log":
-            self.server_was_selected_event.clear()
-            self.selected_server = ""
-            self.refresh(recompose=True)
-
-    async def capture_container_log(self, container: Container):
-        def stream_logs():
-            for char in container.logs(stream=True, follow=True, tail=150):
-                if container is not None and container.name is not None:
-                    self.container_logs[container.name].write(
-                        char.decode("utf-8").strip()
-                    )
-
-        await asyncio.to_thread(stream_logs)
-
-    async def update_graphs(self):
-        # window size of 0
+    async def monitor_servers(self) -> None:
         while True:
-            for plot_id, plot in self.plots.items():
-                plot.data = self.plot_data[plot_id]
-                await asyncio.sleep(1)  # Update every second
-            await asyncio.sleep(1)
-
-    def cpu_per(
-        self, cpu_stats: dict[str, Any], prev_cpu_stats: dict[str, Any]
-    ) -> float:
-        if not prev_cpu_stats:
-            return 0.0
-        cpu_delta = (
-            cpu_stats["cpu_usage"]["total_usage"]
-            - prev_cpu_stats["cpu_usage"]["total_usage"]
-        )
-        return (
-            cpu_delta
-            / (
-                cpu_stats["cpu_usage"]["system_cpu_usage"]
-                - prev_cpu_stats["cpu_usage"]["system_cpu_usage"]
-            )
-            * 100.0
-        )
-
-    async def collect_stats(self):
-        # this for loop is infinite, it will run until the container is stopped
-        await self.server_was_selected_event.wait()
-        for stat in self.client.containers.get(self.selected_server).stats(
-            stream=True, decode=True
-        ):
-            self.plot_data["server_cpu_usage"].append(
-                self.cpu_per(stat["cpu_stats"], stat["precpu_stats"])
-            )
-            self.plot_data["server_memory_usage"].append(
-                stat["memory_stats"]["usage"] / stat["memory_stats"]["limit"] * 100
-            )
-            self.plot_data["server_storage_usage"].append(0)
-            self.plot_data["server_network_usage"].append(
-                stat["networks"]["eth0"]["tx_bytes"]
-            )
-            if len(self.plot_data["server_cpu_usage"]) > self.plot_data_window_size:
-                self.plot_data["server_cpu_usage"].pop(0)
-                self.plot_data["server_memory_usage"].pop(0)
-                self.plot_data["server_storage_usage"].pop(0)
-                self.plot_data["server_network_usage"].pop(0)
-            await asyncio.sleep(1)
-
-    async def manager_task(self):
-        self.refresh_container_table()
-
-        while True:
-            # await asyncio.sleep(5)  # Adjust the sleep time as needed
-            async with asyncio.TaskGroup() as tg:
-                for container in self.containers:
-                    if (
-                        container.status == "running"
-                        and container.name not in self.container_log_tasks
-                    ):
-                        self.container_log_tasks[container.name] = tg.create_task(
-                            self.capture_container_log(container), name=container.name
+            await asyncio.sleep(2)
+            # monitor all rows in table and associated stats
+            for row in self.server_table.rows:
+                # get Container_data for row
+                row_data = self.server_table.get_row(row)
+                container_data = self.servers.get(row_data[0])
+                if container_data and len(container_data.metrics) > 0:
+                    latest_data = container_data.metrics[-1]
+                    if latest_data:
+                        self.server_table.update_cell(row, "status", container_data.container.status)
+                        self.server_table.update_cell(
+                            row, "uptime", container_data.container.attrs["State"]["StartedAt"]
                         )
-            await asyncio.sleep(1)
+                        self.server_table.update_cell(row, "cpu", latest_data.cpu_perc)
+                        self.server_table.update_cell(row, "memory", latest_data.mem_perc)
+                        self.server_table.update_cell(row, "network_up", latest_data.net_io_up)
+                        self.server_table.update_cell(row, "network_down", latest_data.net_io_down)
+                        self.server_table.update_cell(row, "storage_up", latest_data.block_io_up)
+                        self.server_table.update_cell(row, "storage_down", latest_data.block_io_down)
 
-    def refresh_container_table(self):
-        row = self.active_servers_table.cursor_row
-        self.active_servers_table.clear()
-        self.containers = list(self.client.containers.list())
-        for container in self.containers:
-            uptime = container.attrs["State"]["StartedAt"]
-            self.active_servers_table.add_row(
-                container.name,
-                container.status,
-                uptime,
-                self.plot_data["server_cpu_usage"][-1],
-                self.plot_data["server_memory_usage"][-1],
-                self.plot_data["server_network_usage"][-1],
-                self.plot_data["server_storage_usage"][-1],
-            )
-        self.active_servers_table.move_cursor(row=row)
+    def _add_server(self, image_name, server_name, env):
+        new_container = docker_image_spawn_container(image_name, server_name, env)
+        if new_container:
+            # add row with empty data so it
+            self.create_row(server_name)
 
-    def server_form_callback(self, result: Any):
-        # {"image_name": "image_name", "server_name": "string", "env": env}
-        image_name = result.get("image_name")
-        server_name = result.get("server_name")
-        env = result.get("env", {})
-        if not image_name:
-            logging.warning("Image name or server name is missing.")
-            return
-        docker_image_spawn_container(image_name, server_name, env)
+    def create_row(self, server_name: str) -> None:
+        self.server_table.add_row(
+            server_name,
+            "--",
+            "--",
+            "--",
+            "--",
+            "--",
+            "--",
+            "--",
+            "--",
+        )
 
-    def on_data_table_row_selected(self, event: DataTable.RowSelected):
-        self.selected_server = self.active_servers_table.get_row(event.row_key)[0]
-        self.sub_title = self.selected_server
-        self.server_was_selected_event.set()
-        self.refresh_container_table()
-        self.refresh(recompose=True)
+    def on_server_created(self, data) -> None:
+        server_name = data.get("server_name", "")
+        image_name = data.get("image_name", "")
+        env = data.get("env", {})
+        self._add_server(image_name, server_name, env)
+
+    def on_data_table_row_selected(self, event: DataTable.RowSelected) -> None:
+        self._selected_server_key = self.server_table.get_row(event.row_key)[0]
+        self.switch_log()
+
+    # log threading
+
+    def switch_log(self):
+        if self.log_thread_obj.is_alive():
+            self.cancel_log_stream()
+        self.log_thread_obj = threading.Thread(target=self.log_thread, daemon=True)
+        self.log_thread_obj.start()
+
+    def log_thread(self) -> None:
+        if self.selected_server:
+            self.log_widget.clear()
+            self.log_stream = self.selected_server.container.logs(stream=True, tail=100)
+            for line in self.log_stream:
+                self.log_widget.write(line.decode("utf-8").rstrip())
+        else:
+            self.log_widget.clear()
+            self.log_widget.write("No server selected.")
+
+    def cancel_log_stream(self) -> None:
+        if self.log_stream:
+            self.log_stream.close()

@@ -43,10 +43,23 @@ def docker_start_container(container: Container) -> bool:
     return True
 
 
-def docker_list_containers() -> list[str]:
+def docker_list_containers_names() -> list[str]:
     client = docker.from_env()
     containers = client.containers.list(all=True)
     return [container.name for container in containers]
+
+
+def docker_container_get(container_name: str) -> Container | None:
+    client = docker.from_env()
+    try:
+        return client.containers.get(container_name)
+    except docker.errors.NotFound:
+        return None
+
+
+def docker_list_containers() -> list[Container]:
+    client = docker.from_env()
+    return client.containers.list(all=True)
 
 
 def docker_stop_all_containers() -> None:

@@ -11,7 +11,8 @@
                 "hidden": false,
                 "group": "devtools",
                 "order": 1
-            }
+            },
+            "postDebugTask": "Close Terminal"
         }
     ],
 }

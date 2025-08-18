@@ -56,6 +56,7 @@ def docker_image_spawn_container(image: Image | str, server_name: str, env: dict
         # volumes=docker_get_image_exposed_volumes(image_obj),
     )
     container.start()
+    return container
 
 
 def docker_pull_image(image_name: str) -> Image | None:

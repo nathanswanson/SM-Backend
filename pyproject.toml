@@ -17,6 +17,9 @@ Homepage = "https://example.com/server-manager"
 [tool.hatch.version]
 path = "src/server_manager/__about__.py"
 
+[tool.hatch.envs.hatch-test]
+dependencies = ["pytest"]
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/server_manager"]
 

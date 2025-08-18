@@ -2,57 +2,11 @@
     "version": "2.0.0",
     "tasks": [
         {
-            "label": "build server_manager",
+            "label": "Close Terminal",
             "type": "shell",
-            "command": "hatch build",
+            "command": "exit",
             "problemMatcher": [],
-            "group": "build",
-            "detail": "Builds the server_manager project using Hatch."
-        },
-        {
-            "label": "install server_manager",
-            "type": "shell",
-            "command": "hatch env run pip install -- -e ${workspaceFolder}/",
-            "problemMatcher": [],
-            "group": "build",
-        },
-        {
-            "label": "run devtools",
-            "type": "shell",
-            "presentation": {
-                "group": "dev_tool",
-                "panel": "dedicated",
-                "showReuseMessage": false,
-                "clear": true
-            },
-            "command": "hatch env run textual console",
-        },
-        {
-            "label": "run server_manager",
-            "type": "shell",
-            "command": "hatch",
-            "args": [
-                "run",
-                "textual",
-                "--",
-                "run",
-                "--dev",
-                "server_manager.__main__:main"
-            ],
-            "presentation": {
-                "group": "dev_tool",
-                "panel": "dedicated",
-                "showReuseMessage": false,
-                "clear": true
-            }
-        },
-        {
-            "label": "run server_manager in debug mode",
-            "dependsOn": [
-                "run devtools",
-                "run server_manager"
-            ],
-            "dependsOrder": "parallel"
+            "group": "build"
         }
     ]
 }

@@ -20,7 +20,6 @@ def signal_handler(_signal, _frame):
 
 
 def main():
-    client = docker.from_env()  # Initialize Docker
     signal.signal(signal.SIGINT, signal_handler)
-    app = MyWindow(client)
+    app = MyWindow()
     app.run()

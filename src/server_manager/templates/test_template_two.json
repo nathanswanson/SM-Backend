@@ -1,0 +1,10 @@
+{
+    "name": "Minecraft",
+    "description": "tes",
+    "image": "itzg/minecraft-server",
+    "env": [
+        {
+            "EULA": "TRUE"
+        }
+    ]
+}

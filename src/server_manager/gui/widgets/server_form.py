@@ -22,9 +22,7 @@ class ServerForm(ModalScreen):
         self.template: Template | None = None
         self.templates: dict[str, Template] = templates
         self.container_fields: dict[str, str] = {}
-        self.dynamic_box = Static(
-            "Enter Server to see available options", id="server_dynamic_box"
-        )
+        self.dynamic_box = Static("Enter Server to see available options", id="server_dynamic_box")
         super().__init__(id="ServerForm")
 
     @on(Button.Pressed, "#create_server_button")
@@ -49,9 +47,7 @@ class ServerForm(ModalScreen):
 
     @on(Button.Pressed, "#apply_server_name")
     def apply_template(self):
-        self.template = TemplateManager().get_template(
-            self.query_one("#server_name_input", Input).value
-        )
+        self.template = TemplateManager().get_template(self.query_one("#server_name_input", Input).value)
         if self.template is None:
             return
         self.log(f"Server name applied: {self.template}")
@@ -63,29 +59,21 @@ class ServerForm(ModalScreen):
                 self.refresh(recompose=True)
 
     def compose(self):
-        text_input = Input(
-            self.template.name if self.template else "", id="server_name_input"
-        )
+        text_input = Input(self.template.name if self.template else "", id="server_name_input")
         with Grid(id="serverdialog"):
             yield Label("Image Name:", id="server_name_label")
             yield text_input
             yield Button("✔️", id="apply_server_name")
             with Static(
-                id="server_dynamic_box"
-                if len(self.container_fields) == 0
-                else "server_dynamic_box_expanded",
+                id="server_dynamic_box" if len(self.container_fields) == 0 else "server_dynamic_box_expanded",
                 expand=True,
             ):
                 if len(self.container_fields) == 0:
-                    yield Label(
-                        "Enter Server to see available options", classes="dynamic_box"
-                    )
+                    yield Label("Enter Server to see available options", classes="dynamic_box")
                 else:
                     for config_entry in self.container_fields:
                         yield Horizontal(
-                            Label(
-                                config_entry, classes="server_dynamic_box_entry_label"
-                            ),
+                            Label(config_entry, classes="server_dynamic_box_entry_label"),
                             Input(
                                 name=config_entry,
                                 classes="server_dynamic_box_entry_input",
