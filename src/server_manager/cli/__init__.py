@@ -181,14 +181,25 @@ def template_group():
 @click.argument("name")
 @click.argument("description")
 @click.argument("image")
+@click.option("--tags")
+@click.option("--cpu", type=int)
+@click.option("--memory", type=str)
+@click.option("--extra-args")
 @click.pass_context
-def create_template(ctx, name: str, description: str, image: str):
+def create_template(
+    ctx, name: str, description: str, image: str, tags: list[str], cpu: int, memory: str, extra_args: list[str]
+):
     """Create a new server template."""
     console.print(f"Creating server template: {name}")
     console.print(f"Description: {description}")
     console.print(f"Image: {image}")
-    console.print(ctx.args)
-    TemplateManager().create_template(name, description, image, _varargs_to_dict(ctx.args))
+    console.print(f"Tags: {tags}")
+    console.print(f"CPU: {cpu}")
+    console.print(f"Memory: {memory}")
+    console.print(f"Extra Args: {extra_args}")
+    env = _varargs_to_dict(ctx.args)
+
+    TemplateManager().create_template(name, description, image, tags, cpu, memory, env, extra_args)
 
 
 @template_group.command("remove")

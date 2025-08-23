@@ -15,10 +15,18 @@ default_template_path = Path(os.path.join(os.path.abspath(os.path.dirname(server
 class Template:
     """Represents a server template."""
 
+    @dataclass
+    class Resource:
+        cpu: int
+        memory: str
+
     name: str
     description: str
     image: str
+    tags: list[str]
+    resource: Resource
     env: list[str | dict[str, str]]
+    extra_args: list[str]
 
 
 class TemplateManager(metaclass=SingletonMeta):
@@ -35,9 +43,14 @@ class TemplateManager(metaclass=SingletonMeta):
         # Load templates from the template path
         for template_file in self.template_path.glob("*.json"):
             with open(template_file) as f:
-                template_data = json.load(f)
-                template = Template(**template_data)
-                self._templates[template.name] = template
+                template_data: dict = json.load(f)
+                try:
+                    template_resource = template_data.pop("resource")
+                    template = Template(resource=Template.Resource(**template_resource), **template_data)
+                    self._templates[template.name] = template
+                except TypeError:
+                    # skip bad template
+                    pass
 
     def get_template(self, name: str) -> Template | None:
         return self._templates.get(name)
@@ -67,14 +80,32 @@ class TemplateManager(metaclass=SingletonMeta):
     def get_template_path(self, name: str) -> str:
         return os.path.join(self.template_path, f"{name}.json")
 
-    def create_template(self, name: str, description: str, image: str, env: dict[str, str]) -> Template:
+    def create_template(
+        self,
+        name: str,
+        description: str,
+        image: str,
+        tags: list[str],
+        cpu: int,
+        memory: str,
+        env: dict[str, str],
+        extra_args: list[str],
+    ) -> Template:
         """Create a new template and add it to the manager."""
         if name in self._templates:
             msg = f"Template with name '{name}' already exists."
             raise ValueError(msg)
         # rebundle env from dictionary to array of one size objects
         env_list: list[str | dict[str, str]] = [{k: v} for k, v in env.items()]
-        template = Template(name=name, description=description, image=image, env=env_list)
+        template = Template(
+            name=name,
+            description=description,
+            image=image,
+            tags=tags,
+            resource=Template.Resource(cpu=cpu, memory=memory),
+            env=env_list,
+            extra_args=extra_args,
+        )
         self._templates[name] = template
         # write template to file
         template_file = self.template_path / f"{name}.json"

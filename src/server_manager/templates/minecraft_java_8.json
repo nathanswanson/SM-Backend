@@ -1,0 +1,25 @@
+{
+    "name": "Minecraft",
+    "description": "tes",
+    "image": "itzg/minecraft-server",
+    "tags": [
+        "java8",
+        "latest"
+    ],
+    "resource": {
+        "memory": "2G",
+        "cpu": 2
+    },
+    "env": [
+        "MODRINTH_MODPACK",
+        {
+            "TYPE": "VANILLA"
+        },
+        {
+            "EULA": "TRUE"
+        }
+    ],
+    "extra_args": [
+        ""
+    ]
+}

@@ -1,9 +1,9 @@
 {
     "json.schemas": [
         {
-            "url": "./src/server_manager/templates/templates.schema.json",
+            "url": "./src/server_manager/resources/template.schema.json",
             "fileMatch": [
-                "/server_manager/src/server_manager/templates/templates.json"
+                "/server_manager/src/server_manager/templates/*.json"
             ]
         }
     ],

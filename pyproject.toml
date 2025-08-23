@@ -9,23 +9,37 @@ description = "Server Manager"
 readme = "README.md"
 requires-python = ">=3.12"
 authors = [{ name = "NS", email = "nathanswanson370@gmail.com" }]
+dependencies = [
+    "click",
+    "textual",
+    "textual-autocomplete",
+    "docker",
+    "fastapi[standard]",
+    "python-multipart",
+    "cryptography",
+]
 
-[project.urls]
-Homepage = "https://example.com/server-manager"
+[project.scripts]
+server_manager = "server_manager.cli:server_manager"
 
-# Read version from src/server_manager/__about__.py -> __version__
 [tool.hatch.version]
 path = "src/server_manager/__about__.py"
 
-[tool.hatch.envs.hatch-test]
-dependencies = ["pytest"]
-
 [tool.hatch.build.targets.wheel]
 packages = ["src/server_manager"]
-
-[tool.hatch.envs.default]
-python = "3.12"
+include = ["src/server_manager/gui/upload_tool/styles/global.css"]
 
 [tool.hatch.envs.hatch-static-analysis]
 dependencies = ["ruff>=0.12.8"]
 config-path = "ruff.toml"
+
+# dev
+[tool.hatch.envs.default]
+dependencies = ["textual-dev"]
+
+[tool.hatch.envs.default.scripts]
+dev-console = "textual"
+
+# test
+[tool.hatch.envs.hatch-test]
+dependencies = ["pytest"]

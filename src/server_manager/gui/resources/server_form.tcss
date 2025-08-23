@@ -41,7 +41,6 @@ ServerForm {
     row-span: 3;
     text-align: center;
     height: 20;
-    border: round red;
     layout: grid;
     grid-size: 4;
 }
@@ -53,7 +52,6 @@ ServerForm {
     column-span: 2;
     row-span: 1;
     height: auto;
-    border: round blue;
 }
 
 .server_dynamic_box_entry_label {

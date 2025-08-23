@@ -6,7 +6,7 @@ from textual import on
 from textual.containers import Grid, Horizontal
 from textual.logging import TextualHandler
 from textual.screen import ModalScreen
-from textual.widgets import Button, Input, Label, Static
+from textual.widgets import Button, Input, Label, OptionList, Static
 from textual_autocomplete import AutoComplete
 
 from server_manager.common.template import Template, TemplateManager
@@ -39,7 +39,16 @@ class ServerForm(ModalScreen):
                     continue
                 if field.value:
                     env[field.name] = field.value
-        self.dismiss({"server_name": "", "image_name": self.template.image, "env": env})
+        option_list = self.query_one("#server_tags", OptionList)
+        tag = option_list.options[option_list.highlighted].prompt if option_list.highlighted is not None else "latest"
+        self.dismiss(
+            {
+                "server_name": "",
+                "image_name": f"{self.template.image}:{tag}",
+                "extra_args": self.template.extra_args,
+                "env": env,
+            }
+        )
 
     @on(Button.Pressed, "#cancel_button")
     def cancel(self):
@@ -58,6 +67,18 @@ class ServerForm(ModalScreen):
                     self.container_fields = template_env
                 self.refresh(recompose=True)
 
+    def label_text_box(self, label: str, default: str = ""):
+        return Horizontal(
+            Label(label.replace("_", " ").title(), classes="server_dynamic_box_entry_label"),
+            Input(
+                name=label,
+                classes="server_dynamic_box_entry_input",
+                id=f"server_dynamic_box_entry_{label}",
+                value=default,
+            ),
+            classes="server_dynamic_box_entry",
+        )
+
     def compose(self):
         text_input = Input(self.template.name if self.template else "", id="server_name_input")
         with Grid(id="serverdialog"):
@@ -71,16 +92,18 @@ class ServerForm(ModalScreen):
                 if len(self.container_fields) == 0:
                     yield Label("Enter Server to see available options", classes="dynamic_box")
                 else:
+                    assert self.template is not None
+                    # server name, port
+                    yield self.label_text_box("SERVER_NAME")
+                    yield self.label_text_box("SERVER_PORT")
+                    # server cpu, memory
+                    yield self.label_text_box("SERVER_CPU", str(self.template.resource.cpu))
+                    yield self.label_text_box("SERVER_MEMORY", str(self.template.resource.memory))
+                    # tag drop down
+                    yield OptionList(*self.template.tags, id="server_tags")
+                    # dynamic options
                     for config_entry in self.container_fields:
-                        yield Horizontal(
-                            Label(config_entry, classes="server_dynamic_box_entry_label"),
-                            Input(
-                                name=config_entry,
-                                classes="server_dynamic_box_entry_input",
-                                id=f"server_dynamic_box_entry_{config_entry}",
-                            ),
-                            classes="server_dynamic_box_entry",
-                        )
+                        yield self.label_text_box(config_entry)
             yield Button("Create", id="create_server_button")
             yield Button("Cancel", id="cancel_button")
         yield AutoComplete(

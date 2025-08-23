@@ -84,6 +84,7 @@ class MyWindow(App):
                     yield Button("Debug Log", id="debug_log", classes="control_panel_button")
                     yield Button("Stop Selected Server", id="stop_server", classes="control_panel_button")
                     yield Button("Start Selected Server", id="start_server", classes="control_panel_button")
+                    yield Button("New Template", id="new_template", classes="control_panel_button")
                 yield self.server_table
             yield self.log_widget
         yield Footer()

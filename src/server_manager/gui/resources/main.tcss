@@ -41,7 +41,6 @@ Sparkline {
 
 .metrics_panel {
     height: 100%;
-    border: round red;
 }
 
 .logs_panel {

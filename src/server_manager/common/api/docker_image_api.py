@@ -33,7 +33,9 @@ def docker_get_image_exposed_volumes(image: Image) -> list[str] | None:
     return list(exposed_volumes.keys())
 
 
-def docker_image_spawn_container(image: Image | str, server_name: str, env: dict[str, str]):
+def docker_image_spawn_container(
+    image: Image | str, server_name: str, env: dict[str, str], cpu_count: int = 2, memory_size="2G"
+):
     image_obj: Image | None = None
     image_str: str = ""
     if isinstance(image, Image):
@@ -49,10 +51,13 @@ def docker_image_spawn_container(image: Image | str, server_name: str, env: dict
     client = docker.from_env()
     container = client.containers.create(
         image=image_str,
-        name=server_name if server_name != "peanut" else None,
+        name=server_name,
         environment=env,
+        cpu_count=cpu_count,
+        mem_limit=memory_size,
         detach=True,
-        ports={port: int(_strip_non_numerals(port)) for port in docker_get_image_exposed_ports(image_obj)},
+        # ports={port: int(_strip_non_numerals(port)) for port in docker_get_image_exposed_ports(image_obj)},
+        publish_all_ports=True,
         # volumes=docker_get_image_exposed_volumes(image_obj),
     )
     container.start()

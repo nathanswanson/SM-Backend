@@ -3,16 +3,47 @@
     "type": "object",
     "additionalProperties": false,
     "required": [
+        "name",
         "image"
     ],
     "properties": {
+        "name": {
+            "type": "string",
+            "description": "The name of the template."
+        },
         "image": {
             "type": "string",
             "description": "The name of the Docker image to use for the container."
         },
+        "tags": {
+            "type": "array",
+            "description": "Additional Tags for the Docker image. defaults to 'latest'.",
+            "items": {
+                "type": "string"
+            }
+        },
         "description": {
             "type": "string",
             "description": "A brief description of the template."
+        },
+        "resource": {
+            "type": "object",
+            "description": "Minimum resource requirements/allocated for the container.",
+            "properties": {
+                "cpu": {
+                    "type": "number",
+                    "minimum": 1,
+                    "maximum": 4,
+                    "default": 2,
+                    "description": "The number of CPU cores allocated to the container."
+                },
+                "memory": {
+                    "type": "string",
+                    "pattern": "^[0-9]+[KMG]?$",
+                    "default": "1G",
+                    "description": "The amount of memory allocated to the container, e.g., '2G' for 2 gigabytes."
+                }
+            }
         },
         "env": {
             "type": "array",
@@ -29,6 +60,19 @@
                     }
                 ]
             }
+        },
+        "extra_args": {
+            "oneOf": [
+                {
+                    "type": "string"
+                },
+                {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            ]
         }
     }
 }
