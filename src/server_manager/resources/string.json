@@ -1,0 +1,21 @@
+{
+    "name": "string",
+    "image": "string",
+    "tags": [
+        "string"
+    ],
+    "description": "string",
+    "resource": {
+        "cpu": 2.0,
+        "memory": "1G"
+    },
+    "env": [
+        "string",
+        {
+            "additionalProp1": "string",
+            "additionalProp2": "string",
+            "additionalProp3": "string"
+        }
+    ],
+    "extra_args": "string"
+}

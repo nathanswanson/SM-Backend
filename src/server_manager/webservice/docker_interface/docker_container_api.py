@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 import socket
 from typing import TYPE_CHECKING
 
 import docker
 import docker.errors
+from fastapi.responses import StreamingResponse
 
 if TYPE_CHECKING:
     from docker.models.containers import Container
@@ -29,13 +32,18 @@ def docker_stop_container(container: Container) -> bool:
 
 
 def docker_remove_container(container: Container) -> bool:
-    container.stop()
-    container.remove()
-    return True
+    try:
+        container.stop()
+        container.remove()
+    except docker.errors.APIError:
+        logging.exception("")
+        return False
+    else:
+        return True
 
 
 def docker_container_running(container: Container) -> bool:
-    return container.status == "running"
+    return container.status == "running" if container.health == "unknown" else container.health == "healthy"
 
 
 def docker_start_container(container: Container) -> bool:
@@ -87,3 +95,21 @@ def docker_container_create(
         return False
     else:
         return True
+
+
+async def log_stream(container: Container, line_count: int):
+    lines_printed = 0
+    logs = container.logs(follow=True, stream=True, stderr=True, stdout=True, tail=line_count)
+    for log in logs:
+        yield log
+        if lines_printed < line_count:
+            lines_printed += 1
+            await asyncio.sleep(0.1)
+        else:
+            await asyncio.sleep(1)
+
+
+def docker_container_logs(container: Container, line_count: int = 1) -> StreamingResponse:
+    if not container:
+        raise KeyError
+    return StreamingResponse(log_stream(container, line_count), media_type="text/plain")

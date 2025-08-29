@@ -4,16 +4,19 @@
 from __future__ import annotations
 
 import click
+import uvicorn
 from rich import print
 from rich.console import Console
 
 from server_manager.__about__ import __version__
-from server_manager.common.api.docker_container_api import (
+from server_manager.cli.completion.container_auto import ContainerAutoType
+from server_manager.cli.completion.image_auto import ImageAutoType
+from server_manager.webservice.docker_interface.docker_container_api import (
     docker_list_containers_names,
     docker_remove_container,
     docker_stop_container,
 )
-from server_manager.common.api.docker_image_api import (
+from server_manager.webservice.docker_interface.docker_image_api import (
     docker_get_env_vars,
     docker_get_image,
     docker_image_exists,
@@ -21,9 +24,7 @@ from server_manager.common.api.docker_image_api import (
     docker_list_images,
     docker_pull_image,
 )
-from server_manager.common.template import TemplateManager
-from server_manager.completion.container_auto import ContainerAutoType
-from server_manager.completion.image_auto import ImageAutoType
+from server_manager.webservice.webservice import app
 
 console = Console()
 
@@ -42,12 +43,11 @@ def _varargs_to_dict(varargs_str) -> dict[str, str]:
 
 @click.group(context_settings={"help_option_names": ["-h", "--help"]}, invoke_without_command=True)
 @click.version_option(version=__version__, prog_name="server_manager")
+@click.option("--dev", is_flag=True, help="Run in development mode")
 @click.pass_context
-def server_manager(ctx):
+def server_manager(ctx, dev):
     if ctx.invoked_subcommand is None:
-        from server_manager.gui.main import main
-
-        main()
+        uvicorn.run(app, host="0.0.0.0", port=8000, reload=dev)
 
 
 @server_manager.group("image")
@@ -161,68 +161,68 @@ def remove_container(ctx):
     console.print("Done!" if task else "Failed!")
 
 
-@server_manager.command("list")
-@click.argument("choice", type=click.Choice(["images", "containers", "templates"]))
-def list_resources(choice: str):
-    if choice == "images":
-        console.print(docker_list_images())
-    elif choice == "containers":
-        console.print(docker_list_containers_names())
-    elif choice == "templates":
-        console.print(TemplateManager().get_templates())
+# @server_manager.command("list")
+# @click.argument("choice", type=click.Choice(["images", "containers", "templates"]))
+# def list_resources(choice: str):
+#     if choice == "images":
+#         console.print(docker_list_images())
+#     elif choice == "containers":
+#         console.print(docker_list_containers_names())
+#     elif choice == "templates":
+#         console.print(TemplateManager().get_templates())
 
 
-@server_manager.group("template")
-def template_group():
-    """Manage server templates."""
+# @server_manager.group("template")
+# def template_group():
+#     """Manage server templates."""
 
 
-@template_group.command("create", context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
-@click.argument("name")
-@click.argument("description")
-@click.argument("image")
-@click.option("--tags")
-@click.option("--cpu", type=int)
-@click.option("--memory", type=str)
-@click.option("--extra-args")
-@click.pass_context
-def create_template(
-    ctx, name: str, description: str, image: str, tags: list[str], cpu: int, memory: str, extra_args: list[str]
-):
-    """Create a new server template."""
-    console.print(f"Creating server template: {name}")
-    console.print(f"Description: {description}")
-    console.print(f"Image: {image}")
-    console.print(f"Tags: {tags}")
-    console.print(f"CPU: {cpu}")
-    console.print(f"Memory: {memory}")
-    console.print(f"Extra Args: {extra_args}")
-    env = _varargs_to_dict(ctx.args)
+# @template_group.command("create", context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
+# @click.argument("name")
+# @click.argument("description")
+# @click.argument("image")
+# @click.option("--tags")
+# @click.option("--cpu", type=int)
+# @click.option("--memory", type=str)
+# @click.option("--extra-args")
+# @click.pass_context
+# def create_template(
+#     ctx, name: str, description: str, image: str, tags: list[str], cpu: int, memory: str, extra_args: list[str]
+# ):
+#     """Create a new server template."""
+#     console.print(f"Creating server template: {name}")
+#     console.print(f"Description: {description}")
+#     console.print(f"Image: {image}")
+#     console.print(f"Tags: {tags}")
+#     console.print(f"CPU: {cpu}")
+#     console.print(f"Memory: {memory}")
+#     console.print(f"Extra Args: {extra_args}")
+#     env = _varargs_to_dict(ctx.args)
 
-    TemplateManager().create_template(name, description, image, tags, cpu, memory, env, extra_args)
-
-
-@template_group.command("remove")
-@click.argument("name")
-def remove_template(name: str):
-    """Remove a server template."""
-    console.print(f"Removing server template: {name}")
+#     TemplateManager().create_template(name, description, image, tags, cpu, memory, env, extra_args)
 
 
-@template_group.command("edit", context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
-@click.argument("name")
-@click.option("--editor", is_flag=True)
-@click.option("--description")
-@click.option("--image")
-def edit_template(name: str, editor: bool, description: str, image: str):  # noqa: FBT001
-    # if editor ignore everything else
-    if editor:
-        click.edit(filename=TemplateManager().get_template_path(name))
-    else:
-        print(description, image)
+# @template_group.command("remove")
+# @click.argument("name")
+# def remove_template(name: str):
+#     """Remove a server template."""
+#     console.print(f"Removing server template: {name}")
 
 
-@template_group.command("show")
-@click.argument("name")
-def show_template(name: str):
-    console.print(TemplateManager().get_template(name))
+# @template_group.command("edit", context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
+# @click.argument("name")
+# @click.option("--editor", is_flag=True)
+# @click.option("--description")
+# @click.option("--image")
+# def edit_template(name: str, editor: bool, description: str, image: str):  # noqa: FBT001
+#     # if editor ignore everything else
+#     if editor:
+#         click.edit(filename=TemplateManager().get_template_path(name))
+#     else:
+#         print(description, image)
+
+
+# @template_group.command("show")
+# @click.argument("name")
+# def show_template(name: str):
+#     console.print(TemplateManager().get_template(name))

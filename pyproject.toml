@@ -11,8 +11,6 @@ requires-python = ">=3.12"
 authors = [{ name = "NS", email = "nathanswanson370@gmail.com" }]
 dependencies = [
     "click",
-    "textual",
-    "textual-autocomplete",
     "docker",
     "fastapi[standard]",
     "python-multipart",
@@ -35,10 +33,7 @@ config-path = "ruff.toml"
 
 # dev
 [tool.hatch.envs.default]
-dependencies = ["textual-dev"]
-
-[tool.hatch.envs.default.scripts]
-dev-console = "textual"
+dependencies = ["datamodel-code-generator"]
 
 # test
 [tool.hatch.envs.hatch-test]

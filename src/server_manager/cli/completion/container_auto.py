@@ -5,7 +5,7 @@ from typing import override
 from click import Context, Parameter, ParamType
 from click.shell_completion import CompletionItem
 
-from server_manager.common.api.docker_container_api import docker_list_containers_names
+from server_manager.webservice.docker_interface.docker_container_api import docker_list_containers_names
 
 
 class ContainerAutoType(ParamType):
