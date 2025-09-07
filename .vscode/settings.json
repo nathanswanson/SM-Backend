@@ -1,0 +1,27 @@
+{
+    "json.schemas": [
+        {
+            "url": "./src/server_manager/resources/template.schema.json",
+            "fileMatch": [
+                "/server_manager/src/server_manager/templates/*.json"
+            ]
+        }
+    ],
+    "files.exclude": {
+        "**/.git": true,
+        "**/.svn": true,
+        "**/.hg": true,
+        "**/.DS_Store": true,
+        "**/Thumbs.db": true,
+        "**/__pycache__": true,
+        "**/.pytest_cache": true,
+        "**/.venv": true,
+        "**/__init__.py": false
+    },
+    "editor.formatOnSave": true,
+    "ruff.nativeServer": "on",
+    "ruff.trace.server": "messages",
+    "ruff.configurationPreference": "filesystemFirst",
+    "python.analysis.typeCheckingMode": "standard",
+    "python.analysis.autoImportCompletions": true,
+}

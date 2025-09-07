@@ -25,7 +25,7 @@ def get_template_name(name: str):
     raise HTTPException(status_code=404, detail="Template not found")
 
 
-@template.post(expand_api_url("add_template"), response_model=SuccessResponse)
+@template.post(expand_api_url("create"), response_model=SuccessResponse)
 def add_template(template: Template):
     ret = save_template_to_file(template)
     return SuccessResponse(success=ret)

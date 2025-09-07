@@ -11,11 +11,6 @@ from rich.console import Console
 from server_manager.__about__ import __version__
 from server_manager.cli.completion.container_auto import ContainerAutoType
 from server_manager.cli.completion.image_auto import ImageAutoType
-from server_manager.webservice.docker_interface.docker_container_api import (
-    docker_list_containers_names,
-    docker_remove_container,
-    docker_stop_container,
-)
 from server_manager.webservice.docker_interface.docker_image_api import (
     docker_get_env_vars,
     docker_get_image,
@@ -47,7 +42,7 @@ def _varargs_to_dict(varargs_str) -> dict[str, str]:
 @click.pass_context
 def server_manager(ctx, dev):
     if ctx.invoked_subcommand is None:
-        uvicorn.run(app, host="0.0.0.0", port=8000, reload=dev)
+        uvicorn.run(app, host="0.0.0.0", port=8000)
 
 
 @server_manager.group("image")
@@ -135,30 +130,30 @@ def container(ctx, container_name: str):
     ctx.obj["container_name"] = container_name
 
 
-@container.command("stop")
-@click.pass_context
-def stop_container(ctx):
-    container_name = ctx.obj["container_name"]
-    task = docker_stop_container(container_name)
-    with console.status("Stopping container..."):
-        if task:
-            console.print(f"[green]Successfully stopped container:[/green] {container_name}")
-        else:
-            console.print(f"[red]Failed to stop container:[/red] {container_name}")
-    console.print("Done!" if task else "Failed!")
+# @container.command("stop")
+# @click.pass_context
+# def stop_container(ctx):
+#     container_name = ctx.obj["container_name"]
+#     task = docker_stop_container(container_name)
+#     with console.status("Stopping container..."):
+#         if task:
+#             console.print(f"[green]Successfully stopped container:[/green] {container_name}")
+#         else:
+#             console.print(f"[red]Failed to stop container:[/red] {container_name}")
+#     console.print("Done!" if task else "Failed!")
 
 
-@container.command("remove")
-@click.pass_context
-def remove_container(ctx):
-    container_name = ctx.obj["container_name"]
-    task = docker_remove_container(container_name)
-    with console.status("Removing container..."):
-        if task:
-            console.print(f"[green]Successfully removed container:[/green] {container_name}")
-        else:
-            console.print(f"[red]Failed to remove container:[/red] {container_name}")
-    console.print("Done!" if task else "Failed!")
+# @container.command("remove")
+# @click.pass_context
+# def remove_container(ctx):
+#     container_name = ctx.obj["container_name"]
+#     task = docker_remove_container(container_name)
+#     with console.status("Removing container..."):
+#         if task:
+#             console.print(f"[green]Successfully removed container:[/green] {container_name}")
+#         else:
+#             console.print(f"[red]Failed to remove container:[/red] {container_name}")
+#     console.print("Done!" if task else "Failed!")
 
 
 # @server_manager.command("list")

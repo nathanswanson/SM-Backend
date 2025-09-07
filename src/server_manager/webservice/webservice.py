@@ -5,6 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from server_manager.webservice.api.container_api import container
+from server_manager.webservice.api.system_api import system
 from server_manager.webservice.api.template_api import template
 
 log_path = Path(__file__).resolve().parent.parent / "logs"
@@ -20,7 +21,7 @@ logging.basicConfig(
 app = FastAPI()
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:4000"],
+    allow_origins=["http://localhost:4000", "http://raspberrypi.home:4000"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -29,3 +30,4 @@ app.add_middleware(
 
 app.include_router(container)
 app.include_router(template)
+app.include_router(system)

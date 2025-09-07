@@ -1,9 +1,0 @@
-{
-    "name": "Minecraft",
-    "description": "",
-    "image": "itzg/minecraft-server",
-    "resource": {
-        "cpu": 2,
-        "memory": "1G"
-    }
-}

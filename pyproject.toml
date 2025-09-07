@@ -11,10 +11,11 @@ requires-python = ">=3.12"
 authors = [{ name = "NS", email = "nathanswanson370@gmail.com" }]
 dependencies = [
     "click",
-    "docker",
     "fastapi[standard]",
     "python-multipart",
     "cryptography",
+    "aiodocker",
+    "docker",
 ]
 
 [project.scripts]
@@ -25,7 +26,6 @@ path = "src/server_manager/__about__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/server_manager"]
-include = ["src/server_manager/gui/upload_tool/styles/global.css"]
 
 [tool.hatch.envs.hatch-static-analysis]
 dependencies = ["ruff>=0.12.8"]
@@ -33,7 +33,7 @@ config-path = "ruff.toml"
 
 # dev
 [tool.hatch.envs.default]
-dependencies = ["datamodel-code-generator"]
+dependencies = ["datamodel-code-generator", "debugpy"]
 
 # test
 [tool.hatch.envs.hatch-test]

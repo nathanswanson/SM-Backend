@@ -1,80 +1,102 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import socket
-from typing import TYPE_CHECKING
+from contextlib import asynccontextmanager
+from math import trunc
+from typing import TYPE_CHECKING, Any
 
-import docker
-import docker.errors
-from fastapi.responses import StreamingResponse
+import aiodocker
 
 if TYPE_CHECKING:
-    from docker.models.containers import Container
+    from aiodocker.containers import DockerContainer
+    from fastapi import Request
 
 
-def docker_container_name_exists(container_name: str) -> bool:
-    client = docker.from_env()
+@asynccontextmanager
+async def docker_client():
+    client = aiodocker.Docker()
     try:
-        client.containers.get(container_name)
-    except docker.errors.NotFound:
+        yield client
+    finally:
+        await client.close()
+
+
+@asynccontextmanager
+async def docker_container(container: str):
+    async with docker_client() as client:
+        try:
+            yield client.containers.container(container)
+        except aiodocker.exceptions.DockerError:
+            return
+
+
+async def docker_container_name_exists(name: str) -> bool:
+    async with docker_container(name) as container:
+        return container is not None
+
+
+async def docker_container_stop(name: str) -> bool:
+    async with docker_container(name) as container:
+        if container:
+            await container.stop()
+            return True
         return False
-    except docker.errors.APIError:
+
+
+async def docker_container_remove(name: str) -> bool:
+    async with docker_container(name) as container:
+        if container:
+            await container.stop()
+            await container.delete()
+            return True
         return False
-    else:
-        return True
 
 
-def docker_stop_container(container: Container) -> bool:
-    container.stop()
-    # TODO: add timer
-    return True
-
-
-def docker_remove_container(container: Container) -> bool:
-    try:
-        container.stop()
-        container.remove()
-    except docker.errors.APIError:
-        logging.exception("")
+async def docker_container_start(name: str) -> bool:
+    async with docker_container(name) as container:
+        if container:
+            await container.start()
+            return True
         return False
-    else:
-        return True
 
 
-def docker_container_running(container: Container) -> bool:
-    return container.status == "running" if container.health == "unknown" else container.health == "healthy"
+async def docker_container_running(name: str) -> bool:
+    async with docker_container(name) as container:
+        if container:
+            info = await container.show()
+            return info["State"]["Running"]
+        return False
 
 
-def docker_start_container(container: Container) -> bool:
-    container.start()
-    return True
+def _extract_common_name(container: DockerContainer) -> str:
+    return container._container["Names"][0].strip("/")  # noqa: SLF001
 
 
-def docker_list_containers_names() -> list[str]:
-    client = docker.from_env()
-    containers = client.containers.list(all=True)
-    return [container.name for container in containers]
+async def docker_list_containers_names() -> list[str]:
+    async with docker_client() as client:
+        containers = await client.containers.list(all=True)
+        return [_extract_common_name(container) for container in containers]
 
 
-def docker_container_get(container_name: str) -> Container | None:
-    client = docker.from_env()
-    try:
-        return client.containers.get(container_name)
-    except docker.errors.NotFound:
-        return None
+async def docker_container_get(name: str) -> DockerContainer | None:
+    async with docker_container(name) as container:
+        try:
+            return container
+        except aiodocker.exceptions.DockerError:
+            return None
 
 
-def docker_list_containers() -> list[Container]:
-    client = docker.from_env()
-    return client.containers.list(all=True)
+async def docker_list_containers() -> list[DockerContainer]:
+    async with docker_client() as client:
+        return await client.containers.list(all=True)
 
 
-def docker_stop_all_containers() -> None:
-    client = docker.from_env()
-    containers = client.containers.list()
-    for container in containers:
-        container.stop()
+async def docker_stop_all_containers() -> None:
+    async with docker_client() as client:
+        containers = await client.containers.list()
+        for container in containers:
+            await container.stop()
 
 
 def docker_port_is_free(port: int) -> bool:
@@ -82,34 +104,91 @@ def docker_port_is_free(port: int) -> bool:
         return s.connect_ex(("localhost", port)) != 0
 
 
-def docker_container_create(
-    container_name: str, image_name: str, ports: dict[str, int] | None, volumes: list[str] | None
+def _convert_ports(ports: dict[str, int | None]) -> dict[str, list[dict[str, str]] | None]:
+    values: dict[str, list[dict[str, str]] | None] = {}
+    for int_port, out_port in ports.items():
+        values[int_port] = [{"HostPort": str(out_port)}] if out_port else [{}]
+    return values
+
+
+async def docker_container_create(
+    container_name: str, image_name: str, ports: dict[str, int | None] | None, env: dict[str, str] | None
 ) -> bool:
-    client = docker.from_env()
-    try:
-        container = client.containers.create(
-            image=image_name, name=container_name, detach=True, ports=ports, volumes=volumes
-        )
-        container.start()
-    except docker.errors.APIError:
-        return False
-    else:
-        return True
+    async with docker_client() as client:
+        try:
+            container_args = {
+                "Image": image_name,
+                "Tty": True,
+                "OpenStdin": True,
+            }
+            if ports:
+                container_args["HostConfig"] = {"PortBindings": _convert_ports(ports)}
+            else:
+                container_args["HostConfig"] = {"PublishAllPorts": True}
 
-
-async def log_stream(container: Container, line_count: int):
-    lines_printed = 0
-    logs = container.logs(follow=True, stream=True, stderr=True, stdout=True, tail=line_count)
-    for log in logs:
-        yield log
-        if lines_printed < line_count:
-            lines_printed += 1
-            await asyncio.sleep(0.1)
+            if env:
+                env_string: list[str] = []
+                for item_key, item_val in env.items():
+                    env_string.append(f"{item_key}={item_val}")
+                container_args["Env"] = env_string
+            container = await client.containers.create(name=container_name, config=container_args)
+            await container.start()
+        except aiodocker.exceptions.DockerError:
+            return False
         else:
-            await asyncio.sleep(1)
+            return True
 
 
-def docker_container_logs(container: Container, line_count: int = 1) -> StreamingResponse:
-    if not container:
-        raise KeyError
-    return StreamingResponse(log_stream(container, line_count), media_type="text/plain")
+async def docker_container_metrics(name: str, request: Request):  # noqa: ARG001
+    async with docker_container(name) as container:
+        if container:
+            async for stat in container.stats():
+                # cpu_per, mem_usage_per, net_up_byte, net_down_byte, block_up_byte, block_down_byte
+                yield (
+                    [
+                        _cpu_percent(stat),
+                        round(stat["memory_stats"]["usage"] / stat["memory_stats"]["limit"], 2),
+                        stat["networks"]["eth0"]["rx_bytes"],
+                        stat["networks"]["eth0"]["tx_bytes"],
+                        stat["blkio_stats"]["io_service_bytes_recursive"][0]["value"],
+                        stat["blkio_stats"]["io_service_bytes_recursive"][1]["value"],
+                    ]
+                )
+                await asyncio.sleep(10)
+
+
+def _cpu_percent(metric: dict[str, Any]) -> float:
+    total_usage_current = metric["cpu_stats"]["cpu_usage"]["total_usage"]
+    total_usage_prev = metric["precpu_stats"]["cpu_usage"]["total_usage"]
+    total_system_current = metric["cpu_stats"]["system_cpu_usage"]
+
+    total_system_prev = metric["precpu_stats"].get("system_cpu_usage", 0)
+    cpu_percent = (total_usage_current - total_usage_prev) / (total_system_current - total_system_prev) * 100
+    return trunc(cpu_percent * 100) / 100
+
+
+async def docker_container_send_command(name: str, command: str):
+    async with docker_container(name) as container:
+        # Get the raw socket
+        if container:
+            sock = container.attach(
+                stdin=True,
+                stdout=True,
+                stderr=True,
+            )
+
+            await sock.write_in(f"{command}\n".encode())
+            return True
+        return False
+
+
+async def docker_container_logs(name: str, request: Request):  # noqa: ARG001
+    async with docker_container(name) as container:
+        if container:
+            log_line = ""
+            async for log in container.log(stdout=True, follow=True):
+                for char in log:
+                    log_line += char
+                    if char == "\n":
+                        yield log_line
+                        log_line = ""

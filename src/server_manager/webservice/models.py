@@ -57,7 +57,24 @@ class Template(BaseModel):
         Field(description="Minimum resource requirements/allocated for the container."),
     ] = None
     env: list[str | dict[str, str]] | None = None
-    extra_args: str | list[str] | None = None
+
+
+class HardwareInfoResponse(BaseModel):
+    class CPUHardwareResponse(BaseModel):
+        architecture: str
+        cpu_count: int
+        model_name: str
+        threads_per_core: int
+
+    cpu: CPUHardwareResponse
+    mem: int
+
+
+class ContainerCreateRequest(BaseModel):
+    server_name: str
+    template: str
+    port: dict[str, int | None] | None
+    env: dict[str, str]
 
 
 class ContainerStatusResponse(BaseModel):

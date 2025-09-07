@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "debugpy",
+            "request": "launch",
+            "cwd": "${workspaceFolder}",
+            "name": "Launch Dev FastAPI",
+            "python": "${command:python.interpreterPath}",
+            "module": "server_manager",
+        },
+        {
+            "name": "Remote debug",
+            "type": "debugpy",
+            "request": "attach",
+            "connect": {
+                "port": 5467,
+                "host": "0.0.0.0"
+            },
+            "pathMappings": [
+                {
+                    "localRoot": "${workspaceFolder}",
+                    "remoteRoot": "~/backend/"
+                }
+            ]
+        },
+    ]
+}
