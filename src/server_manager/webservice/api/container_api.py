@@ -1,3 +1,7 @@
+import io
+import tarfile
+import zipfile
+
 from fastapi import APIRouter, HTTPException, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
@@ -21,19 +25,19 @@ from server_manager.webservice.docker_interface.docker_volume_api import (
 )
 from server_manager.webservice.models import (
     ContainerCreateRequest,
-    ContainerListResponse,
+    StringListResponse,
 )
-from server_manager.webservice.template_loader import get_template
+from server_manager.webservice.util.data_access import DB
 from server_manager.webservice.util.util import expand_api_url
 
 container = APIRouter(tags=["container"])
 metric_data_rate = 10
 
 
-@container.get(expand_api_url("list"), response_model=ContainerListResponse)
+@container.get(expand_api_url("list"), response_model=StringListResponse)
 async def list_containers():
     names = await docker_list_containers_names()
-    return ContainerListResponse(container=names)
+    return StringListResponse(values=names)
 
 
 @container.get(expand_api_url("{name}"))
@@ -53,7 +57,7 @@ async def stop_container(name: str):
 
 @container.post(expand_api_url("create/{template_name}"))
 async def create_container(container_create_req: ContainerCreateRequest):
-    template = get_template(container_create_req.template)
+    template = DB().get_template_by_name(container_create_req.template)
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
     return await docker_container_create(
@@ -101,7 +105,19 @@ async def read_file(container_name: str, path: str):
 
 @container.post(expand_api_url("{container_name}/fs/upload/"))
 async def upload_file(container_name: str, path: str, file: UploadFile):
-    return await docker_file_upload(container_name, path, await file.read())
+    tar_bytes = io.BytesIO()
+    zip_file = zipfile.ZipFile(file.file)
+    with tarfile.open(mode="w", fileobj=tar_bytes) as tmp_tar:
+        if not file.filename or not file.size:
+            return False
+        for item in zip_file.filelist:
+            info = tarfile.TarInfo(name=item.filename)
+            info.size = item.file_size
+            with zip_file.open(item) as zip_item:
+                tmp_tar.addfile(info, fileobj=zip_item)
+    tar_bytes.seek(0)
+
+    return await docker_file_upload(container_name, path, tar_bytes.read())
 
 
 @container.post(expand_api_url("{container_name}/fs/delete/"))

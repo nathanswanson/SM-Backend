@@ -15,7 +15,10 @@ dependencies = [
     "python-multipart",
     "cryptography",
     "aiodocker",
+    "pyJWT",
     "docker",
+    "sqlmodel",
+    "websockets",
 ]
 
 [project.scripts]
@@ -33,7 +36,7 @@ config-path = "ruff.toml"
 
 # dev
 [tool.hatch.envs.default]
-dependencies = ["datamodel-code-generator", "debugpy"]
+dependencies = ["datamodel-code-generator", "debugpy", "python-dotenv"]
 
 # test
 [tool.hatch.envs.hatch-test]

@@ -143,28 +143,34 @@ async def docker_container_metrics(name: str, request: Request):  # noqa: ARG001
     async with docker_container(name) as container:
         if container:
             async for stat in container.stats():
-                # cpu_per, mem_usage_per, net_up_byte, net_down_byte, block_up_byte, block_down_byte
-                yield (
-                    [
-                        _cpu_percent(stat),
-                        round(stat["memory_stats"]["usage"] / stat["memory_stats"]["limit"], 2),
-                        stat["networks"]["eth0"]["rx_bytes"],
-                        stat["networks"]["eth0"]["tx_bytes"],
-                        stat["blkio_stats"]["io_service_bytes_recursive"][0]["value"],
-                        stat["blkio_stats"]["io_service_bytes_recursive"][1]["value"],
-                    ]
-                )
+                try:
+                    # cpu_per, mem_usage_per, net_up_byte, net_down_byte, block_up_byte, block_down_byte
+                    yield (
+                        [
+                            _cpu_percent(stat),
+                            round(stat["memory_stats"]["usage"] / stat["memory_stats"]["limit"], 2),
+                            stat["networks"]["eth0"]["rx_bytes"],
+                            stat["networks"]["eth0"]["tx_bytes"],
+                            stat["blkio_stats"]["io_service_bytes_recursive"][0]["value"],
+                            stat["blkio_stats"]["io_service_bytes_recursive"][1]["value"],
+                        ]
+                    )
+                except KeyError:
+                    yield ([0, 0, 0, 0, 0, 0])
                 await asyncio.sleep(10)
 
 
 def _cpu_percent(metric: dict[str, Any]) -> float:
-    total_usage_current = metric["cpu_stats"]["cpu_usage"]["total_usage"]
-    total_usage_prev = metric["precpu_stats"]["cpu_usage"]["total_usage"]
-    total_system_current = metric["cpu_stats"]["system_cpu_usage"]
+    try:
+        total_usage_current = metric["cpu_stats"]["cpu_usage"]["total_usage"]
+        total_usage_prev = metric["precpu_stats"]["cpu_usage"]["total_usage"]
+        total_system_current = metric["cpu_stats"]["system_cpu_usage"]
 
-    total_system_prev = metric["precpu_stats"].get("system_cpu_usage", 0)
-    cpu_percent = (total_usage_current - total_usage_prev) / (total_system_current - total_system_prev) * 100
-    return trunc(cpu_percent * 100) / 100
+        total_system_prev = metric["precpu_stats"].get("system_cpu_usage", 0)
+        cpu_percent = (total_usage_current - total_usage_prev) / (total_system_current - total_system_prev) * 100
+        return trunc(cpu_percent * 100) / 100
+    except KeyError:
+        return 0
 
 
 async def docker_container_send_command(name: str, command: str):

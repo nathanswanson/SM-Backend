@@ -1,37 +1,32 @@
 from fastapi import APIRouter, HTTPException
 
-from server_manager.webservice.models import SuccessResponse, Template, TemplateListResponse
-from server_manager.webservice.template_loader import (
-    delete_template_file,
-    get_template,
-    get_template_names,
-    save_template_to_file,
-)
+from server_manager.webservice.db_models import Template
+from server_manager.webservice.models import StringListResponse
+from server_manager.webservice.util.data_access import DB
 from server_manager.webservice.util.util import expand_api_url
 
 template = APIRouter(tags=["template"])
 
 
-@template.get(expand_api_url("list"), response_model=TemplateListResponse)
+@template.get(expand_api_url("list"), response_model=StringListResponse)
 def list_templates():
-    return TemplateListResponse(template=list(get_template_names()))
+    return StringListResponse(values=list(DB().get_template_name_list()))
 
 
 @template.get(expand_api_url("{name}"), response_model=Template)
 def get_template_name(name: str):
-    template = get_template(name)
+    template = DB().get_template_by_name(name)
     if template:
         return template
     raise HTTPException(status_code=404, detail="Template not found")
 
 
-@template.post(expand_api_url("create"), response_model=SuccessResponse)
+@template.post(expand_api_url("create"))
 def add_template(template: Template):
-    ret = save_template_to_file(template)
-    return SuccessResponse(success=ret)
+    ret = DB().create_template(template)
+    return ret is not None
 
 
-@template.post(expand_api_url("{name}/delete"), response_model=SuccessResponse)
+@template.post(expand_api_url("{name}/delete"))
 def delete_template(name: str):
-    ret = delete_template_file(name)
-    return SuccessResponse(success=ret)
+    return DB().delete_template(name)

@@ -7,6 +7,10 @@
             "cwd": "${workspaceFolder}",
             "name": "Launch Dev FastAPI",
             "python": "${command:python.interpreterPath}",
+            "args": [
+                "--host=0.0.0.0",
+                "--dev"
+            ],
             "module": "server_manager",
         },
         {
