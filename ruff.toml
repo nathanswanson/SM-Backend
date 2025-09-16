@@ -3,6 +3,7 @@ line-length = 120
 [format]
 docstring-code-format = true
 docstring-code-line-length = 80
+quote-style = "double"
 
 [lint]
 select = [
@@ -153,7 +154,6 @@ select = [
   "F901",
   "FA100",
   "FA102",
-  "FBT002",
   "FLY002",
   "G001",
   "G002",
@@ -444,7 +444,6 @@ select = [
   "SLOT001",
   "SLOT002",
   "T100",
-  "T201",
   "T203",
   "TC001",
   "TC002",

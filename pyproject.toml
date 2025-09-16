@@ -19,6 +19,7 @@ dependencies = [
     "docker",
     "sqlmodel",
     "websockets",
+    "python-socketio",
 ]
 
 [project.scripts]
@@ -36,8 +37,15 @@ config-path = "ruff.toml"
 
 # dev
 [tool.hatch.envs.default]
-dependencies = ["datamodel-code-generator", "debugpy", "python-dotenv"]
+dependencies = [
+    "datamodel-code-generator",
+    "debugpy",
+    "python-dotenv",
+    "pytest",
+    "pytest-asyncio",
+    "websocket-client",
+]
 
 # test
 [tool.hatch.envs.hatch-test]
-dependencies = ["pytest"]
+dependencies = ["pytest", "pytest-asyncio"]

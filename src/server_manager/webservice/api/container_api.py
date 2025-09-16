@@ -2,14 +2,13 @@ import io
 import tarfile
 import zipfile
 
-from fastapi import APIRouter, HTTPException, Request, UploadFile
+from fastapi import APIRouter, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
 from server_manager.webservice.docker_interface.docker_container_api import (
     docker_container_create,
     docker_container_get,
-    docker_container_logs,
-    docker_container_metrics,
+    docker_container_logs_tail,
     docker_container_remove,
     docker_container_running,
     docker_container_send_command,
@@ -71,25 +70,20 @@ async def get_container_status(container_name: str):
     return {"running": is_running}
 
 
-@container.get(expand_api_url("{container_name}/metrics"))
-async def get_container_metrics(container_name: str, request: Request):
-    async def metrics_generator():
-        async for metrics in docker_container_metrics(container_name, request):
-            yield f"data: {metrics}\n\n"
+# @container.get(expand_api_url("{container_name}/metrics"))
+# async def get_container_metrics(
+#     container_name: str,
+# ):
+#     async def metrics_generator():
+#         async for metrics in docker_container_metrics(container_name):
+#             yield f"data: {metrics}\n\n"
 
-    return StreamingResponse(metrics_generator(), media_type="text/event-stream")
+#     return StreamingResponse(metrics_generator(), media_type="text/event-stream")
 
 
 @container.get(expand_api_url("{container_name}/logs"))
-async def get_log_message(container_name: str, request: Request, line_count: int | None = None):
-    if not line_count:
-        line_count = 30
-
-    async def event_generator():
-        async for metrics in docker_container_logs(container_name, request):
-            yield f"data: {metrics}\n\n"
-
-    return StreamingResponse(event_generator(), media_type="text/event-stream")
+async def get_log_message(container_name: str, line_count: int | None = None) -> list[str]:
+    return await docker_container_logs_tail(container_name, tail=line_count or 25)
 
 
 # Volume
