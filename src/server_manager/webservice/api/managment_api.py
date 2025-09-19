@@ -1,6 +1,7 @@
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
 from server_manager.webservice.db_models import User
@@ -11,7 +12,17 @@ login = APIRouter(tags=["access"])
 
 @login.post("/token")
 async def login_user(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
-    return await auth_aquire_access_token(form_data)
+    token = await auth_aquire_access_token(form_data)
+    response = JSONResponse(content={"message": "Login successful"})
+    response.set_cookie(
+        key="token",
+        value=token.access_token,
+        httponly=True,
+        secure=True,
+        samesite="strict",
+        max_age=token.expire_time,
+    )
+    return response
 
 
 @login.post("/me")

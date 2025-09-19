@@ -9,7 +9,6 @@ from pathlib import Path
 
 import socketio
 from fastapi import Depends, FastAPI
-from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
 
@@ -53,24 +52,12 @@ app.include_router(system, **oauth2_wrapper)
 app.include_router(login)
 
 # frontend
-app.mount("/", StaticFiles(directory=STATIC_PATH), name="static")
-
-
-@app.get("/")
-async def index():
-    return FileResponse(os.path.join(STATIC_PATH, "index.html"))
+app.mount("/", StaticFiles(directory=STATIC_PATH, html=True), name="static")
 
 
 # socket io reroute
 sio_app = socketio.AsyncServer(logger=False, engineio_logger=False, async_mode="asgi")
 app = socketio.ASGIApp(sio_app, app)
-
-sio_app.instrument(
-    auth={
-        "username": "admin",
-        "password": "e",
-    }
-)
 
 
 def check_empty_room(room: str):

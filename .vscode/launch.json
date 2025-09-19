@@ -14,7 +14,7 @@
                 "--port",
                 "8000"
             ],
-            "envFile": "${workspaceFolder}/.env"
+            "envFile": "${workspaceFolder}/debug.env"
         }
     ]
 }

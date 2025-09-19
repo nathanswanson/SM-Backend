@@ -36,6 +36,7 @@ class ContainerStatusResponse(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    expire_time: int | None = None
 
 
 class TokenData(BaseModel):

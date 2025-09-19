@@ -86,4 +86,4 @@ async def auth_aquire_access_token(form_data: Annotated[OAuth2PasswordRequestFor
         )
     access_token_expire = timedelta(minutes=_ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(data={"sub": user.username}, expired_delta=access_token_expire)
-    return Token(access_token=access_token, token_type="bearer")  # noqa: S106
+    return Token(access_token=access_token, token_type="bearer", expire_time=access_token_expire.seconds)  # noqa: S106
