@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import os
+import sys
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
 from enum import StrEnum
@@ -31,6 +32,7 @@ try:
     STATIC_PATH = os.environ["SM_STATIC_PATH"]
 except KeyError as e:
     logging.critical("Env var %s is missing. Is the .env missing?", e.args)
+    sys.exit(1)
 else:
     logging.info("frontend server files path: %s", STATIC_PATH)
 
