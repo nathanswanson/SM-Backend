@@ -13,6 +13,7 @@ dependencies = [
     "click",
     "fastapi[standard]",
     "python-multipart",
+    "bcrypt",
     "cryptography",
     "aiodocker",
     "pyJWT",

@@ -4,3 +4,5 @@ __pycache__/
 .venv/
 cfi.uuid
 .env
+caddy-local-root.crt
+debug.env

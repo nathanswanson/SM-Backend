@@ -1,5 +1,6 @@
 import asyncio
 import logging
+import os
 from collections.abc import AsyncGenerator, Callable
 from dataclasses import dataclass
 from enum import StrEnum
@@ -7,8 +8,9 @@ from pathlib import Path
 
 import socketio
 from fastapi import Depends, FastAPI
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import FileResponse
 from fastapi.security import OAuth2PasswordBearer
+from fastapi.staticfiles import StaticFiles
 
 from server_manager.webservice.api.container_api import container
 from server_manager.webservice.api.managment_api import login
@@ -19,47 +21,46 @@ from server_manager.webservice.docker_interface.docker_container_api import (
     merge_streams,
 )
 
-# def web_server_start(host: str, port: int, dev: bool):
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-log_path = Path(__file__).resolve().parent.parent / "logs"
-Path(log_path).mkdir(parents=True, exist_ok=True)
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(message)s",
     datefmt="[%X]",
 )
 
-allowed_origins = [
-    "http://localhost:4000",
-    "http://raspberrypi.home:4000",
-    "https://admin.socket.io",
-    "http://localhost:8000",
-]
+try:
+    STATIC_PATH = os.environ["SM_STATIC_PATH"]
+except KeyError as e:
+    logging.critical("Env var %s is missing. Is the .env missing?", e.args)
+else:
+    logging.info("frontend server files path: %s", STATIC_PATH)
+
+# def web_server_start(host: str, port: int, dev: bool):
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
+log_path = Path(__file__).resolve().parent.parent / "logs"
+Path(log_path).mkdir(parents=True, exist_ok=True)
+
 
 app = FastAPI()
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=allowed_origins,
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
 
 oauth2_wrapper: dict = {}
-if not True:
-    oauth2_wrapper = {"dependencies": [Depends(oauth2_scheme)]}
+
+oauth2_wrapper = {"dependencies": [Depends(oauth2_scheme)]}
 app.include_router(container, **oauth2_wrapper)
 app.include_router(template, **oauth2_wrapper)
 app.include_router(system, **oauth2_wrapper)
-if not True:
-    app.include_router(login)
+app.include_router(login)
+
+# frontend
+app.mount("/", StaticFiles(directory=STATIC_PATH), name="static")
+
+
+@app.get("/")
+async def index():
+    return FileResponse(os.path.join(STATIC_PATH, "index.html"))
 
 
 # socket io reroute
-sio_app = socketio.AsyncServer(
-    logger=False, engineio_logger=False, async_mode="asgi", cors_allowed_origins=allowed_origins
-)
+sio_app = socketio.AsyncServer(logger=False, engineio_logger=False, async_mode="asgi")
 app = socketio.ASGIApp(sio_app, app)
 
 sio_app.instrument(

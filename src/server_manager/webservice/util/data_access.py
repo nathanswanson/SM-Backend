@@ -1,3 +1,4 @@
+import os
 from collections.abc import Sequence
 
 import sqlalchemy.exc
@@ -7,13 +8,10 @@ from sqlmodel import Session, SQLModel, create_engine
 from server_manager.webservice.db_models import Template, User
 from server_manager.webservice.util.singleton import SingletonMeta
 
-sqlite_file_name = "dev.db"
-sqlite_url = f"sqlite:///../db/{sqlite_file_name}"
-
 
 class DB(metaclass=SingletonMeta):
     def __init__(self):
-        self._engine = create_engine(sqlite_url, echo=True)
+        self._engine = create_engine(os.environ["DB_CONNECTION"], echo=True)
         SQLModel.metadata.create_all(self._engine)
 
     def create_user(self, user: User) -> User:
