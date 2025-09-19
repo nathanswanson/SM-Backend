@@ -3,3 +3,6 @@ __pycache__/
 .ruff_cache/
 .venv/
 cfi.uuid
+.env
+caddy-local-root.crt
+debug.env

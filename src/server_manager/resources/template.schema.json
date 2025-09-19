@@ -22,6 +22,13 @@
                 "type": "string"
             }
         },
+        "mount_points": {
+            "type": "array",
+            "description": "The mount points for the container.",
+            "items": {
+                "type": "string"
+            }
+        },
         "description": {
             "type": "string",
             "description": "A brief description of the template."
@@ -60,19 +67,6 @@
                     }
                 ]
             }
-        },
-        "extra_args": {
-            "oneOf": [
-                {
-                    "type": "string"
-                },
-                {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                }
-            ]
         }
     }
 }

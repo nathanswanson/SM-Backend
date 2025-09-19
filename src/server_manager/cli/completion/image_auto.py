@@ -5,7 +5,7 @@ from typing import override
 from click import Context, Parameter, ParamType
 from click.shell_completion import CompletionItem
 
-from server_manager.common.api.docker_image_api import docker_list_images
+from server_manager.webservice.docker_interface.docker_image_api import docker_list_images
 
 
 class ImageAutoType(ParamType):

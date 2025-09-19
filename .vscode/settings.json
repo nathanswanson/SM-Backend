@@ -19,8 +19,13 @@
         "**/__init__.py": false
     },
     "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+        "source.fixAll": "always",
+        "source.organizeImports": "always"
+    },
     "ruff.nativeServer": "on",
     "ruff.trace.server": "messages",
     "ruff.configurationPreference": "filesystemFirst",
     "python.analysis.typeCheckingMode": "standard",
+    "python.analysis.autoImportCompletions": true,
 }

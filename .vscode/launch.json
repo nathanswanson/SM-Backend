@@ -2,17 +2,19 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Launch Server Manager",
+            "name": "uvicorn",
             "type": "debugpy",
             "request": "launch",
-            "module": "server_manager",
-            "console": "integratedTerminal",
-            "presentation": {
-                "hidden": false,
-                "group": "devtools",
-                "order": 1
-            },
-            "postDebugTask": "Close Terminal"
+            "module": "uvicorn",
+            "args": [
+                "src.server_manager.webservice.webservice:app",
+                "--reload",
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000"
+            ],
+            "envFile": "${workspaceFolder}/.env"
         }
-    ],
+    ]
 }
