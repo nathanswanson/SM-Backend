@@ -108,8 +108,11 @@ def _extract_common_name(container: DockerContainer) -> str:
 async def docker_list_containers_names() -> list[str]:
     async with docker_client() as client:
         containers = await client.containers.list(all=True)
-        set(containers).difference_update(banned_container_access)
-        return [_extract_common_name(container) for container in containers]
+        return [
+            _extract_common_name(container)
+            for container in containers
+            if _extract_common_name(container) not in banned_container_access
+        ]
 
 
 async def docker_container_get(name: str) -> DockerContainer | None:
