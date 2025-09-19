@@ -8,11 +8,14 @@ from math import trunc
 from typing import TYPE_CHECKING, Any
 
 import aiodocker
+from fastapi import HTTPException
 
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from aiodocker.containers import DockerContainer
+
+banned_container_access = ["server-manager", "rproxy", "docker-socket-proxy"]
 
 
 @dataclass
@@ -51,11 +54,15 @@ async def docker_container(container: str):
 
 
 async def docker_container_name_exists(name: str) -> bool:
+    if name in banned_container_access:
+        raise HTTPException(status_code=403, detail="Access to container denied")
     async with docker_container(name) as container:
         return container is not None
 
 
 async def docker_container_stop(name: str) -> bool:
+    if name in banned_container_access:
+        raise HTTPException(status_code=403, detail="Access to container denied")
     async with docker_container(name) as container:
         if container:
             await container.stop()
@@ -64,6 +71,8 @@ async def docker_container_stop(name: str) -> bool:
 
 
 async def docker_container_remove(name: str) -> bool:
+    if name in banned_container_access:
+        raise HTTPException(status_code=403, detail="Access to container denied")
     async with docker_container(name) as container:
         if container:
             await container.stop()
@@ -73,6 +82,8 @@ async def docker_container_remove(name: str) -> bool:
 
 
 async def docker_container_start(name: str) -> bool:
+    if name in banned_container_access:
+        raise HTTPException(status_code=403, detail="Access to container denied")
     async with docker_container(name) as container:
         if container:
             await container.start()
@@ -81,6 +92,8 @@ async def docker_container_start(name: str) -> bool:
 
 
 async def docker_container_running(name: str) -> bool:
+    if name in banned_container_access:
+        raise HTTPException(status_code=403, detail="Access to container denied")
     async with docker_container(name) as container:
         if container:
             info = await container.show()
@@ -95,10 +108,13 @@ def _extract_common_name(container: DockerContainer) -> str:
 async def docker_list_containers_names() -> list[str]:
     async with docker_client() as client:
         containers = await client.containers.list(all=True)
+        set(containers).difference_update(banned_container_access)
         return [_extract_common_name(container) for container in containers]
 
 
 async def docker_container_get(name: str) -> DockerContainer | None:
+    if name in banned_container_access:
+        raise HTTPException(status_code=403, detail="Access to container denied")
     async with docker_container(name) as container:
         try:
             return container
@@ -108,7 +124,7 @@ async def docker_container_get(name: str) -> DockerContainer | None:
 
 async def docker_list_containers() -> list[DockerContainer]:
     async with docker_client() as client:
-        return await client.containers.list(all=True)
+        return list(set(await client.containers.list(all=True)).difference(banned_container_access))
 
 
 async def docker_stop_all_containers() -> None:
@@ -159,6 +175,8 @@ async def docker_container_create(
 
 
 async def docker_container_metrics(container_name: str) -> AsyncGenerator[str]:
+    if container_name in banned_container_access:
+        raise HTTPException(status_code=403, detail="Access to container denied")
     async with docker_container(container_name) as container:
         if container:
             async for stat in container.stats():
@@ -209,6 +227,8 @@ def _cpu_percent(metric: dict[str, Any]) -> float:
 
 
 async def docker_container_logs_tail(container_name: str, tail: int) -> list[str]:
+    if container_name in banned_container_access:
+        raise HTTPException(status_code=403, detail="Access to container denied")
     client = aiodocker.Docker()
     container: DockerContainer = await client.containers.get(container_name)
     logs = await container.log(tail=tail, stdout=True, stderr=True)
@@ -249,7 +269,7 @@ async def merge_streams() -> AsyncGenerator[Message, None]:
 
         async with docker_client() as client:
             while True:
-                for container in await client.containers.list():
+                for container in set(await client.containers.list()).difference(banned_container_access):
                     if (container_name := _extract_common_name(container)) not in tasks:
 
                         async def enqueue_stream(stream, container, command: str):
