@@ -9,6 +9,7 @@ from pathlib import Path
 
 import socketio
 from fastapi import Depends, FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
 
@@ -20,6 +21,7 @@ from server_manager.webservice.docker_interface.docker_container_api import (
     docker_container_get,
     merge_streams,
 )
+from server_manager.webservice.util.auth import auth_get_active_user
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,7 +37,6 @@ except KeyError as e:
 else:
     logging.info("frontend server files path: %s", STATIC_PATH)
 
-# def web_server_start(host: str, port: int, dev: bool):
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 log_path = Path(__file__).resolve().parent.parent / "logs"
 Path(log_path).mkdir(parents=True, exist_ok=True)
@@ -43,9 +44,21 @@ Path(log_path).mkdir(parents=True, exist_ok=True)
 
 app = FastAPI()
 
+cors_allowed_origins = []
+if os.environ.get("SM_ENV") == "DEV":
+    logging.info("CORS middleware enabled")
+    cors_allowed_origins = ["http://localhost:4000"]
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=cors_allowed_origins,
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
 oauth2_wrapper: dict = {}
 
-oauth2_wrapper = {"dependencies": [Depends(oauth2_scheme)]}
+oauth2_wrapper = {"dependencies": [Depends(auth_get_active_user)]}
 app.include_router(container, **oauth2_wrapper)
 app.include_router(template, **oauth2_wrapper)
 app.include_router(system, **oauth2_wrapper)
@@ -56,7 +69,9 @@ app.mount("/", StaticFiles(directory=STATIC_PATH, html=True), name="static")
 
 
 # socket io reroute
-sio_app = socketio.AsyncServer(logger=False, engineio_logger=False, async_mode="asgi")
+sio_app = socketio.AsyncServer(
+    logger=False, engineio_logger=False, async_mode="asgi", cors_allowed_origins=cors_allowed_origins
+)
 app = socketio.ASGIApp(sio_app, app)
 
 

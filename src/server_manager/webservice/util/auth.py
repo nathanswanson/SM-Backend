@@ -1,12 +1,12 @@
 import os
 from datetime import UTC, datetime, timedelta
-from typing import Annotated
+from typing import Annotated, Optional
 
 import bcrypt
 import jwt
 from dotenv import load_dotenv
-from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi import Cookie, Depends, Header, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 
 from server_manager.webservice.db_models import User
 from server_manager.webservice.models import Token, TokenData
@@ -19,9 +19,6 @@ _ACCESS_TOKEN_EXPIRE_MINUTES = 30
 _SECRET_KEY = os.environ["SECRET_KEY"]
 
 _salt = bcrypt.gensalt()
-
-
-_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
 
 def verify_password(plain_password: str, hashed_password: str):
@@ -49,12 +46,27 @@ def create_access_token(data: dict, expired_delta: timedelta | None = None):
     return jwt.encode(to_encode, _SECRET_KEY, algorithm=_ALGORITHM)
 
 
-async def auth_get_user(token: Annotated[str, Depends(_oauth2_scheme)]):
+async def auth_get_user(
+    token_cookie: Optional[str] = Cookie(default=None, alias="token"),
+    authorization: Optional[str] = Header(default=None),
+):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate User",
         headers={"WWW-Authenticate": "Bearer"},
     )
+
+    token = None
+
+    # Prefer cookie
+    if token_cookie:
+        token = token_cookie
+    # Fallback: Authorization: Bearer <token>
+    elif authorization and authorization.startswith("Bearer "):
+        token = authorization[len("Bearer ") :]
+
+    if not token:
+        raise credentials_exception
 
     try:
         payload = jwt.decode(token, _SECRET_KEY, algorithms=[_ALGORITHM])
@@ -62,8 +74,9 @@ async def auth_get_user(token: Annotated[str, Depends(_oauth2_scheme)]):
         if username is None:
             raise credentials_exception
         token_data = TokenData(username=username)
-    except:  # noqa: E722
-        raise credentials_exception  # noqa: B904
+    except Exception:
+        raise credentials_exception
+
     user = DB().get_user_by_username(token_data.username)
     if user is None:
         raise credentials_exception

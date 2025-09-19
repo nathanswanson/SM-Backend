@@ -1,3 +1,4 @@
+import os
 from typing import Annotated
 
 from fastapi import APIRouter, Depends
@@ -8,6 +9,7 @@ from server_manager.webservice.db_models import User
 from server_manager.webservice.util.auth import auth_aquire_access_token, auth_get_active_user
 
 login = APIRouter(tags=["access"])
+dev_mode = os.environ.get("SM_ENV") == "DEV"
 
 
 @login.post("/token")
@@ -18,8 +20,8 @@ async def login_user(form_data: Annotated[OAuth2PasswordRequestForm, Depends()])
         key="token",
         value=token.access_token,
         httponly=True,
-        secure=True,
-        samesite="strict",
+        secure=not dev_mode,
+        samesite="lax" if dev_mode else "strict",
         max_age=token.expire_time,
     )
     return response
