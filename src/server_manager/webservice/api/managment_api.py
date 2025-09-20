@@ -6,7 +6,7 @@ from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
 from server_manager.webservice.db_models import User
-from server_manager.webservice.util.auth import auth_aquire_access_token, auth_get_active_user
+from server_manager.webservice.util.auth import auth_aquire_access_token, auth_get_active_user, create_user
 
 login = APIRouter(tags=["access"])
 dev_mode = os.environ.get("SM_ENV") == "DEV"
@@ -25,6 +25,11 @@ async def login_user(form_data: Annotated[OAuth2PasswordRequestForm, Depends()])
         max_age=token.expire_time,
     )
     return response
+
+
+@login.post("/create")
+async def create_user_account(username: str, password: str):
+    return create_user(username, password)
 
 
 @login.post("/me")

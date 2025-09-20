@@ -19,6 +19,7 @@ dependencies = [
     "pyJWT",
     "docker",
     "sqlmodel",
+    "psycopg2-binary",
     "websockets",
     "python-socketio",
 ]

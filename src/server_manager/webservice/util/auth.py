@@ -39,6 +39,11 @@ def auth_user(username: str, password: str):
     return user if verify_password(password, user.hashed_password) else False
 
 
+def create_user(username: str, password: str):
+    user: User = User(username=username, disabled=True, admin=False, hashed_password=get_password_hash(password))
+    DB().create_user(user)
+
+
 def create_access_token(data: dict, expired_delta: timedelta | None = None):
     to_encode = data.copy()
     expire = datetime.now(UTC) + expired_delta if expired_delta else datetime.now(UTC) + timedelta(minutes=15)
