@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 
-from server_manager.webservice.db_models import Template
+from server_manager.webservice.db_models import Templates
 from server_manager.webservice.models import StringListResponse
 from server_manager.webservice.util.data_access import DB
 from server_manager.webservice.util.util import expand_api_url
@@ -13,7 +13,7 @@ def list_templates():
     return StringListResponse(values=list(DB().get_template_name_list()))
 
 
-@template.get(expand_api_url("{name}"), response_model=Template)
+@template.get(expand_api_url("{name}"), response_model=Templates)
 def get_template_name(name: str):
     template = DB().get_template_by_name(name)
     if template:
@@ -22,7 +22,7 @@ def get_template_name(name: str):
 
 
 @template.post(expand_api_url("create"))
-def add_template(template: Template):
+def add_template(template: Templates):
     ret = DB().create_template(template)
     return ret is not None
 

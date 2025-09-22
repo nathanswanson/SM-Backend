@@ -118,7 +118,6 @@ async def subscribe(sid, data):
 
 @sio_app.event
 async def unsubscribe(sid, _data):
-    print(sid)
     session_rooms = sio_app.rooms(sid)
     if session_rooms == 0:
         return

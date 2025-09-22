@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from fastapi import Cookie, Depends, Header, HTTPException, status
 from fastapi.security import OAuth2PasswordRequestForm
 
-from server_manager.webservice.db_models import User
+from server_manager.webservice.db_models import Users
 from server_manager.webservice.models import Token, TokenData
 from server_manager.webservice.util.data_access import DB
 
@@ -40,7 +40,7 @@ def auth_user(username: str, password: str):
 
 
 def create_user(username: str, password: str):
-    user: User = User(username=username, disabled=True, admin=False, hashed_password=get_password_hash(password))
+    user: Users = Users(username=username, disabled=True, admin=False, hashed_password=get_password_hash(password))
     DB().create_user(user)
 
 
@@ -88,7 +88,7 @@ async def auth_get_user(
     return user
 
 
-async def auth_get_active_user(current_user: Annotated[User, Depends(auth_get_user)]):
+async def auth_get_active_user(current_user: Annotated[Users, Depends(auth_get_user)]):
     if current_user.disabled:
         raise HTTPException(status_code=400, detail="Disabled account")
     return current_user

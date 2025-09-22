@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
-from server_manager.webservice.db_models import User
+from server_manager.webservice.db_models import Users
 from server_manager.webservice.util.auth import auth_aquire_access_token, auth_get_active_user, create_user
 
 login = APIRouter(tags=["access"])
@@ -33,5 +33,5 @@ async def create_user_account(username: str, password: str):
 
 
 @login.post("/me")
-async def get_user(current_user: Annotated[User, Depends(auth_get_active_user)]):
+async def get_user(current_user: Annotated[Users, Depends(auth_get_active_user)]):
     return current_user
