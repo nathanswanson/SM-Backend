@@ -53,7 +53,7 @@ def auth_user(username: str, password: str):
 def create_user(username: str, password: str):
     """create a new user with disabled=True by default"""
     user: Users = Users(username=username, disabled=True, admin=False, hashed_password=get_password_hash(password))
-    DB().create_user(user)
+    return DB().create_user(user)
 
 
 def create_access_token(data: dict, expired_delta: timedelta | None = None):

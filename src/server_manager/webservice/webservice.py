@@ -26,7 +26,7 @@ from server_manager.webservice.api.managment_api import login
 from server_manager.webservice.api.nodes_api import system
 from server_manager.webservice.api.template_api import template
 from server_manager.webservice.docker_interface.docker_container_api import (
-    docker_container_get,
+    docker_container_name_exists,
     merge_streams,
 )
 from server_manager.webservice.util.auth import auth_get_active_user
@@ -67,11 +67,14 @@ if os.environ.get("SM_ENV") == "DEV":
 
 oauth2_wrapper: dict = {}
 
-oauth2_wrapper = {"dependencies": [Depends(auth_get_active_user)]}
+if os.environ.get("SM_ENV") != "DEV":
+    oauth2_wrapper = {"dependencies": [Depends(auth_get_active_user)]}
+
 app.include_router(container, **oauth2_wrapper)
 app.include_router(template, **oauth2_wrapper)
 app.include_router(system, **oauth2_wrapper)
-app.include_router(login)
+if os.environ.get("SM_ENV") != "DEV":
+    app.include_router(login)
 
 # frontend
 app.mount("/", StaticFiles(directory=STATIC_PATH, html=True), name="static")
@@ -119,7 +122,7 @@ class Provider:
 async def subscribe(sid, data):
     # make sure valid request
     node, container = data.split("+")
-    if await docker_container_get(data[1]) is None:
+    if await docker_container_name_exists(container) is None:
         return  # TODO: add failure response
     await unsubscribe(sid, "")  # leave all prior rooms first
     await sio_app.enter_room(sid, f"{node}+{container}")

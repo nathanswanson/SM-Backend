@@ -23,6 +23,8 @@ class DB(metaclass=SingletonMeta):
         SQLModel.metadata.create_all(self._engine)
 
     def create_user(self, user: Users) -> Users:
+        if (existing_user := self.get_user_by_username(user.username)) is not None:
+            return existing_user
         with Session(self._engine) as session:
             user.admin = False  # admins must be added manually
             session.add(user)

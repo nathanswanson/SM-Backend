@@ -130,23 +130,6 @@ async def docker_list_containers_names() -> list[str]:
         ]
 
 
-async def docker_container_get(name: str) -> DockerContainer | None:
-    """get a container by name"""
-    if name in banned_container_access:
-        raise HTTPException(status_code=403, detail="Access to container denied")
-    async with docker_container(name) as container:
-        try:
-            return container
-        except aiodocker.exceptions.DockerError:
-            return None
-
-
-async def docker_list_containers() -> list[DockerContainer]:
-    """list all containers"""
-    async with docker_client() as client:
-        return list(set(await client.containers.list(all=True)).difference(banned_container_access))
-
-
 async def docker_stop_all_containers() -> None:
     """stop all containers"""
     async with docker_client() as client:
