@@ -1,3 +1,11 @@
+"""
+debug_client.py
+
+Socket.io debug client for testing socket.io server
+
+Author: Nathan Swanson
+"""
+
 import cmd
 from collections import deque
 

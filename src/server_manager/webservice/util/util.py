@@ -1,9 +1,18 @@
+"""
+util.py
+
+Utility functions for the webservice
+
+Author: Nathan Swanson
+"""
+
 import inspect
 import os
 import re
 
 
 def expand_api_url(api_path: str) -> str:
+    """expand an api path to include the file name as a prefix"""
     caller = inspect.currentframe()
     if caller:
         caller = getattr(caller, "f_back", None)
@@ -18,6 +27,7 @@ def expand_api_url(api_path: str) -> str:
 
 
 def url_as_slug(url: str) -> str:
+    """convert a url path to a slug (last part of the path)"""
     pattern = r"\/([a-zA-Z0-9-_]*)$"
     match = re.search(pattern, url)
     if match:

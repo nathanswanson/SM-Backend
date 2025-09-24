@@ -1,3 +1,11 @@
+"""
+docker_container_api.py
+
+Docker Container API for managing Docker containers
+
+Author: Nathan Swanson
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -54,6 +62,7 @@ async def docker_container(container: str):
 
 
 async def docker_container_name_exists(name: str) -> bool:
+    """check if a container name exists"""
     if name in banned_container_access:
         raise HTTPException(status_code=403, detail="Access to container denied")
     async with docker_container(name) as container:
@@ -61,6 +70,7 @@ async def docker_container_name_exists(name: str) -> bool:
 
 
 async def docker_container_stop(name: str) -> bool:
+    """stop a container by name"""
     if name in banned_container_access:
         raise HTTPException(status_code=403, detail="Access to container denied")
     async with docker_container(name) as container:
@@ -71,6 +81,7 @@ async def docker_container_stop(name: str) -> bool:
 
 
 async def docker_container_remove(name: str) -> bool:
+    """remove a container by name"""
     if name in banned_container_access:
         raise HTTPException(status_code=403, detail="Access to container denied")
     async with docker_container(name) as container:
@@ -82,6 +93,7 @@ async def docker_container_remove(name: str) -> bool:
 
 
 async def docker_container_start(name: str) -> bool:
+    """start a container by name"""
     if name in banned_container_access:
         raise HTTPException(status_code=403, detail="Access to container denied")
     async with docker_container(name) as container:
@@ -92,6 +104,7 @@ async def docker_container_start(name: str) -> bool:
 
 
 async def docker_container_running(name: str) -> bool:
+    """check if a container is running by name"""
     if name in banned_container_access:
         raise HTTPException(status_code=403, detail="Access to container denied")
     async with docker_container(name) as container:
@@ -102,10 +115,12 @@ async def docker_container_running(name: str) -> bool:
 
 
 def _extract_common_name(container: DockerContainer) -> str:
+    """extract the common name from a container"""
     return container._container["Names"][0].strip("/")  # noqa: SLF001
 
 
 async def docker_list_containers_names() -> list[str]:
+    """list all container names"""
     async with docker_client() as client:
         containers = await client.containers.list(all=True)
         return [
@@ -116,6 +131,7 @@ async def docker_list_containers_names() -> list[str]:
 
 
 async def docker_container_get(name: str) -> DockerContainer | None:
+    """get a container by name"""
     if name in banned_container_access:
         raise HTTPException(status_code=403, detail="Access to container denied")
     async with docker_container(name) as container:
@@ -126,11 +142,13 @@ async def docker_container_get(name: str) -> DockerContainer | None:
 
 
 async def docker_list_containers() -> list[DockerContainer]:
+    """list all containers"""
     async with docker_client() as client:
         return list(set(await client.containers.list(all=True)).difference(banned_container_access))
 
 
 async def docker_stop_all_containers() -> None:
+    """stop all containers"""
     async with docker_client() as client:
         containers = await client.containers.list()
         for container in containers:
@@ -138,11 +156,13 @@ async def docker_stop_all_containers() -> None:
 
 
 def docker_port_is_free(port: int) -> bool:
+    """check if a port is free"""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
         return s.connect_ex(("localhost", port)) != 0
 
 
 def _convert_ports(ports: dict[str, int | None]) -> dict[str, list[dict[str, str]] | None]:
+    """convert ports to docker format"""
     values: dict[str, list[dict[str, str]] | None] = {}
     for int_port, out_port in ports.items():
         values[int_port] = [{"HostPort": str(out_port)}] if out_port else [{}]
@@ -152,6 +172,7 @@ def _convert_ports(ports: dict[str, int | None]) -> dict[str, list[dict[str, str
 async def docker_container_create(
     container_name: str, image_name: str, ports: dict[str, int | None] | None, env: dict[str, str] | None
 ) -> bool:
+    """create a new container from an image"""
     async with docker_client() as client:
         try:
             container_args = {
@@ -178,6 +199,7 @@ async def docker_container_create(
 
 
 async def docker_container_metrics(container_name: str) -> AsyncGenerator[str]:
+    """stream metrics from a container"""
     if container_name in banned_container_access:
         raise HTTPException(status_code=403, detail="Access to container denied")
     async with docker_container(container_name) as container:
@@ -202,6 +224,7 @@ async def docker_container_metrics(container_name: str) -> AsyncGenerator[str]:
 
 
 async def docker_container_send_command(name: str, command: str):
+    """send a command to a container"""
     async with docker_container(name) as container:
         # Get the raw socket
         if container:
@@ -217,6 +240,7 @@ async def docker_container_send_command(name: str, command: str):
 
 
 def _cpu_percent(metric: dict[str, Any]) -> float:
+    """calculate cpu percentage from a metric"""
     try:
         total_usage_current = metric["cpu_stats"]["cpu_usage"]["total_usage"]
         total_usage_prev = metric["precpu_stats"]["cpu_usage"]["total_usage"]
@@ -230,6 +254,7 @@ def _cpu_percent(metric: dict[str, Any]) -> float:
 
 
 async def docker_container_logs_tail(container_name: str, tail: int) -> list[str]:
+    """get the last n lines of logs from a container"""
     if container_name in banned_container_access:
         raise HTTPException(status_code=403, detail="Access to container denied")
     client = aiodocker.Docker()
@@ -242,17 +267,8 @@ async def docker_container_logs_tail(container_name: str, tail: int) -> list[str
     return lines
 
 
-class ContainerOfflineError(Exception):
-    def __init__(self, container: str):
-        self.container = container
-        self.message = f"Container Missing for {container}"
-        super().__init__(self.message)
-
-    def __str__(self):
-        return self.message
-
-
 async def docker_container_logs(container_name: str) -> Any:
+    """stream logs from a container"""
     async with docker_container(container_name) as container:
         if container:
             log_line = ""
@@ -265,6 +281,7 @@ async def docker_container_logs(container_name: str) -> Any:
 
 
 async def merge_streams() -> AsyncGenerator[Message, None]:
+    """merge logs and metrics from all containers"""
     queue = asyncio.Queue()
 
     async def __monitor_all_containers():

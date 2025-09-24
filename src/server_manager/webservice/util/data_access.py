@@ -1,3 +1,11 @@
+"""
+data_access.py
+
+Database access layer using SQLModel and Singleton pattern
+
+Author: Nathan Swanson
+"""
+
 import os
 from collections.abc import Sequence
 

@@ -1,3 +1,11 @@
+"""
+webservice.py
+
+Main webservice app file, includes all routers and socket io handling
+
+Author: Nathan Swanson
+"""
+
 import asyncio
 import logging
 import os
@@ -15,7 +23,7 @@ from fastapi.staticfiles import StaticFiles
 
 from server_manager.webservice.api.container_api import container
 from server_manager.webservice.api.managment_api import login
-from server_manager.webservice.api.system_api import system
+from server_manager.webservice.api.nodes_api import system
 from server_manager.webservice.api.template_api import template
 from server_manager.webservice.docker_interface.docker_container_api import (
     docker_container_get,
@@ -41,9 +49,10 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 log_path = Path(__file__).resolve().parent.parent / "logs"
 Path(log_path).mkdir(parents=True, exist_ok=True)
 
-
+# main app - gets overridden by socket io app at end of file
 app = FastAPI()
 
+# CORS middleware for local dev
 cors_allowed_origins = []
 if os.environ.get("SM_ENV") == "DEV":
     logging.info("CORS middleware enabled")

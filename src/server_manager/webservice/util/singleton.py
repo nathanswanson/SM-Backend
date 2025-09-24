@@ -1,3 +1,11 @@
+"""
+singleton.py
+
+Singleton metaclass for creating singleton classes
+
+Author: Nathan Swanson
+"""
+
 from typing import ClassVar
 
 
