@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
     from aiodocker.containers import DockerContainer
 
-banned_container_access = ["server-manager", "rproxy", "docker-socket-proxy"]
+banned_container_access = ["server-manager", "rproxy", "docker-socket-proxy", "postgres", "postgres_admin"]
 
 
 @dataclass

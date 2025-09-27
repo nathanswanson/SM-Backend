@@ -37,6 +37,10 @@ logging.basicConfig(
     datefmt="[%X]",
 )
 
+if os.environ.get("SM_ENV") == "DEV":
+    logging.getLogger().setLevel(logging.DEBUG)
+    logging.debug("Debug logging enabled")
+
 try:
     STATIC_PATH = os.environ["SM_STATIC_PATH"]
 except KeyError as e:

@@ -1,6 +1,9 @@
 """
 container_api.py
 
+API endpoints for managing Docker containers and their associated volumes.
+
+Author: Nathan Swanson
 
 """
 

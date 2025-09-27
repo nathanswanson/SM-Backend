@@ -50,7 +50,11 @@ def runtime():
     if ret is None or ret.stdout is None:
         return -1
     output = ret.stdout.decode("utf-8").split(" ")
-    return NodeUptimeResponse(uptime_hours=int(output[3]) * 24 + int(output[5].strip(",").split(":")[0]))
+    try:
+        return NodeUptimeResponse(uptime_hours=int(output[3]) * 24 + int(output[6].strip(",").split(":")[0]))
+    except (IndexError, ValueError):
+        logging.exception("Error parsing uptime output: %s", output)
+        return NodeUptimeResponse(uptime_hours=-1)
 
 
 @system.get(expand_api_url("ping"), response_model=NodePingResponse)
