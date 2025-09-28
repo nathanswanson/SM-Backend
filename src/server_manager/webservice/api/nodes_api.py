@@ -8,6 +8,7 @@ Author: Nathan Swanson
 
 import datetime
 import logging
+import re
 import subprocess
 
 from fastapi import APIRouter
@@ -18,6 +19,9 @@ from server_manager.webservice.util.data_access import DB
 from server_manager.webservice.util.util import expand_api_url
 
 system = APIRouter(tags=["nodes"])
+_runtime_pattern = re.compile(
+    r"^\s*\d+:\d+:\d+ up (\d+) days?,\s+(\d+):\d+,\s+\d+\susers?,\s+load\s+average:\s+\d\.\d\d,\s+\d\.\d\d,\s+\d\.\d\d"
+)
 
 
 @system.get(expand_api_url("hardware"), response_model=Nodes)
@@ -49,9 +53,14 @@ def runtime():
     ret = subprocess.run(command, check=True, stdout=subprocess.PIPE)
     if ret is None or ret.stdout is None:
         return -1
-    output = ret.stdout.decode("utf-8").split(" ")
+    output = ret.stdout.decode("utf-8")
+    matches = _runtime_pattern.match(output)
+    if not matches:
+        return -1
+    time = int(matches.group(1)) * 24 + int(matches.group(2))
+
     try:
-        return NodeUptimeResponse(uptime_hours=int(output[3]) * 24 + int(output[6].strip(",").split(":")[0]))
+        return NodeUptimeResponse(uptime_hours=int(time))
     except (IndexError, ValueError):
         logging.exception("Error parsing uptime output: %s", output)
         return NodeUptimeResponse(uptime_hours=-1)
