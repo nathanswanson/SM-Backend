@@ -8,6 +8,7 @@ Author: Nathan Swanson
 """
 
 import io
+import os
 import tarfile
 import zipfile
 
@@ -110,7 +111,19 @@ async def get_directory_filenames(container_name: str, path: str) -> ContainerFi
 @container.get(expand_api_url("{container_name}/fs"))
 async def read_file(container_name: str, path: str):
     """read a file in a container volume, returns a tar archive of the file"""
-    return StreamingResponse(docker_read_file(container_name, path), media_type="application/x-tar")
+    gen = docker_read_file(container_name=container_name, path=path)
+    archive_size = await anext(gen)
+    suggested_filename_base = os.path.basename(path)
+    suggested_filename_no_ext, _ = os.path.splitext(suggested_filename_base)
+    suggested_filename = f"{suggested_filename_no_ext}.tar"
+    return StreamingResponse(
+        gen,
+        headers={
+            "Content-Length": str(archive_size),
+            "Content-Disposition": f'attachment; filename="{suggested_filename}"',
+        },
+        media_type="application/x-tar",
+    )
 
 
 @container.post(expand_api_url("{container_name}/fs/upload/"), response_model=ContainerFileUploadResponse)
