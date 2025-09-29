@@ -24,7 +24,7 @@ load_dotenv()
 
 _ALGORITHM = "HS256"
 _ACCESS_TOKEN_EXPIRE_MINUTES = 30
-_SECRET_KEY = os.environ["SECRET_KEY"]
+_SECRET_KEY = os.environ["SM_SECRET_KEY"]
 
 _salt = bcrypt.gensalt()
 

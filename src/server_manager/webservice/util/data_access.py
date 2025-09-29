@@ -19,7 +19,7 @@ from server_manager.webservice.util.singleton import SingletonMeta
 
 class DB(metaclass=SingletonMeta):
     def __init__(self):
-        self._engine = create_engine(os.environ["DB_CONNECTION"], echo=True)
+        self._engine = create_engine(os.environ["SM_DB_CONNECTION"], echo=True)
         SQLModel.metadata.create_all(self._engine)
 
     def create_user(self, user: Users) -> Users:
