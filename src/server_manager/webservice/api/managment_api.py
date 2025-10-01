@@ -9,11 +9,11 @@ Author: Nathan Swanson
 import os
 from typing import Annotated
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
-from server_manager.webservice.db_models import Users
+from server_manager.webservice.db_models import UserPublic, Users
 from server_manager.webservice.models import CreateUserRequest
 from server_manager.webservice.util.auth import auth_aquire_access_token, auth_get_active_user, create_user
 
@@ -37,13 +37,19 @@ async def login_user(form_data: Annotated[OAuth2PasswordRequestForm, Depends()])
     return response
 
 
-@login.post("/create", response_model=Users)
+@login.post("/create", response_model=UserPublic)
 async def create_user_account(create_user_request: CreateUserRequest):
     """create a new user account"""
     return create_user(create_user_request.username, create_user_request.password.get_secret_value())
 
 
-@login.post("/me")
+@login.post("/logout")
+async def logout_user(response: Response):
+    response.delete_cookie(key="token")
+    return JSONResponse(content={"message": "Logout successful"})
+
+
+@login.post("/me", response_model=UserPublic)
 async def get_user(current_user: Annotated[Users, Depends(auth_get_active_user)]):
     """get current user information"""
     return current_user

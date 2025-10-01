@@ -71,14 +71,14 @@ if os.environ.get("SM_ENV") == "DEV":
 
 oauth2_wrapper: dict = {}
 
-if os.environ.get("SM_ENV") != "DEV":
-    oauth2_wrapper = {"dependencies": [Depends(auth_get_active_user)]}
+# if os.environ.get("SM_ENV") != "DEV":
+oauth2_wrapper = {"dependencies": [Depends(auth_get_active_user)]}
 
 app.include_router(container, **oauth2_wrapper)
 app.include_router(template, **oauth2_wrapper)
 app.include_router(system, **oauth2_wrapper)
-if os.environ.get("SM_ENV") != "DEV":
-    app.include_router(login)
+# if os.environ.get("SM_ENV") != "DEV":
+app.include_router(login)
 
 # frontend
 app.mount("/", StaticFiles(directory=STATIC_PATH, html=True), name="static")

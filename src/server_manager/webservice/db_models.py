@@ -14,10 +14,13 @@ class Templates(SQLModel, table=True):
     resource_min_mem: int | None = Field(description="Minimum Memory resources required")
 
 
-class Users(SQLModel, table=True):
-    username: str = Field(primary_key=True)
-    disabled: bool | None = Field(default=False)
-    admin: bool | None = Field(default=False)
+class UserPublic(SQLModel):
+    username: str = Field(primary_key=True, nullable=False, unique=True, description="Username")
+    disabled: bool | None = None
+    admin: bool | None = None
+
+
+class Users(UserPublic, table=True):
     hashed_password: str
 
 
