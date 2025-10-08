@@ -1,4 +1,6 @@
-from fastapi import UploadFile
+from typing import Annotated
+
+from fastapi import Form, UploadFile
 from pydantic import BaseModel, SecretStr
 
 ## generic
@@ -61,8 +63,8 @@ class ContainerFileListResponse(StringListModel):
 
 
 class ContainerFileUploadRequest(BaseModel):
-    path: str
-    file: UploadFile
+    path: Annotated[str, Form()]
+    file: UploadFile = Form()
 
 
 class ContainerFileUploadResponse(SuccessModel):

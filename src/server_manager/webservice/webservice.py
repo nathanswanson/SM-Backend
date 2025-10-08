@@ -18,12 +18,14 @@ from pathlib import Path
 import socketio
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
 
 from server_manager.webservice.api.container_api import container
 from server_manager.webservice.api.managment_api import login
 from server_manager.webservice.api.nodes_api import system
+from server_manager.webservice.api.server_api import server
 from server_manager.webservice.api.template_api import template
 from server_manager.webservice.docker_interface.docker_container_api import (
     docker_container_name_exists,
@@ -38,7 +40,6 @@ logging.basicConfig(
 )
 
 if os.environ.get("SM_ENV") == "DEV":
-    logging.getLogger().setLevel(logging.DEBUG)
     logging.debug("Debug logging enabled")
 
 try:
@@ -60,7 +61,7 @@ app = FastAPI()
 cors_allowed_origins = []
 if os.environ.get("SM_ENV") == "DEV":
     logging.info("CORS middleware enabled")
-    cors_allowed_origins = ["http://localhost:4000"]
+    cors_allowed_origins = ["http://localhost:4000", "https://admin.socket.io"]
     app.add_middleware(
         CORSMiddleware,
         allow_origins=cors_allowed_origins,
@@ -71,24 +72,31 @@ if os.environ.get("SM_ENV") == "DEV":
 
 oauth2_wrapper: dict = {}
 
-# if os.environ.get("SM_ENV") != "DEV":
 oauth2_wrapper = {"dependencies": [Depends(auth_get_active_user)]}
-
 app.include_router(container, **oauth2_wrapper)
 app.include_router(template, **oauth2_wrapper)
 app.include_router(system, **oauth2_wrapper)
-# if os.environ.get("SM_ENV") != "DEV":
+app.include_router(server, **oauth2_wrapper)
 app.include_router(login)
 
 # frontend
 app.mount("/", StaticFiles(directory=STATIC_PATH, html=True), name="static")
-
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 # socket io reroute
 sio_app = socketio.AsyncServer(
-    logger=False, engineio_logger=False, async_mode="asgi", cors_allowed_origins=cors_allowed_origins
+    logger=False,
+    engineio_logger=False,
+    async_mode="asgi",
+    cors_allowed_origins=cors_allowed_origins,
 )
 app = socketio.ASGIApp(sio_app, app)
+sio_app.instrument(
+    auth={
+        "username": "admin",
+        "password": "password",
+    }
+)
 
 
 def check_empty_room(room: str):
@@ -146,7 +154,7 @@ async def process_all_rooms_task():
         async for message in await merge_streams():
             await sio_app.emit(event=message.event_type, room=message.room, data=message.data, namespace="/")
             await asyncio.sleep(0)
-        await asyncio.sleep(1)
+        await asyncio.sleep(0)
 
 
 sio_app.start_background_task(process_all_rooms_task)

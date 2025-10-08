@@ -13,15 +13,43 @@ import sqlalchemy.exc
 import sqlmodel
 from sqlmodel import Session, SQLModel, create_engine
 
-from server_manager.webservice.db_models import Nodes, Templates, Users
+from server_manager.webservice.db_models import Nodes, Servers, Templates, Users
 from server_manager.webservice.util.singleton import SingletonMeta
 
 
 class DB(metaclass=SingletonMeta):
     def __init__(self):
-        self._engine = create_engine(os.environ["SM_DB_CONNECTION"], echo=True)
+        self._engine = create_engine(os.environ["SM_DB_CONNECTION"])
         SQLModel.metadata.create_all(self._engine)
 
+    def create(self, obj: Servers | Users | Templates | Nodes):
+        with Session(self._engine) as session:
+            session.add(obj)
+            session.commit()
+            session.refresh(obj)
+            return obj
+
+    # server
+    def create_server(self, server: Servers) -> Servers:
+        with Session(self._engine) as session:
+            session.add(server)
+            session.commit()
+            session.refresh(server)
+            return server
+
+    def get_server_by_id(self, server_id: str) -> Servers | None:
+        with Session(self._engine) as session:
+            return session.get(Servers, server_id)
+
+    def delete_server(self, server: Servers | str) -> bool:
+        with Session(self._engine) as session:
+            server_obj = server if isinstance(server, Servers) else session.get(Servers, server)
+            if server_obj is not None:
+                session.delete(server_obj)
+                return True
+        return False
+
+    # user
     def create_user(self, user: Users) -> Users:
         if (existing_user := self.get_user_by_username(user.username)) is not None:
             return existing_user
@@ -44,6 +72,7 @@ class DB(metaclass=SingletonMeta):
                 return True
         return False
 
+    # template
     def get_template_by_name(self, template_name: str) -> Templates | None:
         with Session(self._engine) as session:
             return session.get(Templates, template_name)
@@ -72,6 +101,7 @@ class DB(metaclass=SingletonMeta):
                     return True
         return False
 
+    # node
     def get_node(self, node_id: str):
         with Session(self._engine) as session:
             return session.get(Nodes, node_id)

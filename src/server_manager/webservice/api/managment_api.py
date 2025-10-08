@@ -44,9 +44,11 @@ async def create_user_account(create_user_request: CreateUserRequest):
 
 
 @login.post("/logout")
-async def logout_user(response: Response):
-    response.delete_cookie(key="token")
-    return JSONResponse(content={"message": "Logout successful"})
+async def logout_user(response: Response, current_user: Annotated[Users, Depends(auth_get_active_user)]):
+    print(current_user)
+    response.delete_cookie(key="token", httponly=True, secure=not dev_mode, samesite="lax" if dev_mode else "strict")
+    # return response with message
+    return JSONResponse(headers=response.headers, content={"message": "Logout successful"})
 
 
 @login.post("/me", response_model=UserPublic)

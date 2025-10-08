@@ -32,3 +32,16 @@ class Nodes(SQLModel, table=True):
     max_hz: int = Field(description="Maximum CPU frequency on the node in MHz")
     id: str = Field(primary_key=True, nullable=False, unique=True, description="Node name")
     arch: str = Field(description="Node architecture")
+
+
+class Servers(SQLModel, table=True):
+    id: str = Field(primary_key=True, nullable=False, unique=True, description="Server ID")
+    name: str = Field(nullable=False, unique=True, description="Server name")
+    owner: str = Field(nullable=False, description="Owner username")
+    node: str = Field(nullable=False, description="Node name where the server is hosted")
+    template: str = Field(nullable=False, description="Template name used for the server")
+    env: str | None = Field(description="JSON string of environment variables for the server")
+    cpu: int = Field(description="CPU resources allocated to the server")
+    disk: int = Field(description="Disk space allocated to the server in GB")
+    memory: int = Field(description="Memory allocated to the server in GB")
+    port: int | None = Field(description="Port number assigned to the server")
