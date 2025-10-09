@@ -112,6 +112,7 @@ async def docker_container_running(name: str) -> bool:
             info = await container.show()
             return info["State"]["Running"]
         return False
+    return False
 
 
 def _extract_common_name(container: DockerContainer) -> str:

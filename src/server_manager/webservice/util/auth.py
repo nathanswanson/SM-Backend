@@ -52,14 +52,16 @@ def auth_user(username: str, password: str):
 
 def create_user(username: str, password: str):
     """create a new user with disabled=True by default"""
-    user: Users = Users(username=username, disabled=True, admin=False, hashed_password=get_password_hash(password))
+    user: Users = Users(
+        username=username, id=None, disabled=True, admin=False, hashed_password=get_password_hash(password)
+    )
     return DB().create_user(user)
 
 
 def create_access_token(data: dict, expired_delta: timedelta | None = None):
     """create a JWT access token"""
     to_encode = data.copy()
-    expire = datetime.now(UTC) + expired_delta if expired_delta else datetime.now(UTC) + timedelta(minutes=15)
+    expire = datetime.now(UTC) + expired_delta if expired_delta else datetime.now(UTC) + timedelta(minutes=60)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, _SECRET_KEY, algorithm=_ALGORITHM)
 

@@ -18,36 +18,43 @@ class StringModel(BaseModel):
     item: str
 
 
-## Containers
-class ContainerListResponse(StringListModel):
+class StringToIDMapModel(BaseModel):
+    items: dict[str, int]
+
+
+## Servers
+class ServerListResponse(StringToIDMapModel):
     pass
 
 
-class ContainerCreateRequest(BaseModel):
+class ServerCreateRequest(BaseModel):
     server_name: str
     template: str
     port: dict[str, int | None] | None
     env: dict[str, str]
 
 
-class ContainerCreateResponse(SuccessModel):
+class ServerCreateResponse(SuccessModel):
     pass
 
 
-class ContainerDeleteResponse(SuccessModel):
+class ServerDeleteResponse(SuccessModel):
     pass
 
 
-class ContainerStartResponse(SuccessModel):
+class ServerStartResponse(SuccessModel):
     pass
 
 
-class ContainerStopResponse(SuccessModel):
+class ServerStopResponse(SuccessModel):
     pass
 
 
-class ContainerStatusResponse(BaseModel):
+class ServerStatusResponse(BaseModel):
     running: bool
+
+
+## Containers
 
 
 class ContainerLogsResponse(StringListModel):
@@ -78,7 +85,7 @@ class ContainerCommandResponse(SuccessModel):
 ## Template
 
 
-class TemplateListResponse(StringListModel):
+class TemplateListResponse(StringToIDMapModel):
     pass
 
 
@@ -112,6 +119,10 @@ class CreateUserRequest(BaseModel):
     password: SecretStr
 
 
+class UserListResponse(StringToIDMapModel):
+    pass
+
+
 ## Nodes
 
 
@@ -124,5 +135,9 @@ class NodeDiskUsageResponse(BaseModel):
     used: int
 
 
-class NodePingResponse(BaseModel):
+class NodeListResponse(StringToIDMapModel):
+    pass
+
+
+class AuthPingResponse(BaseModel):
     recieved_at: int
