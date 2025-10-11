@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from server_manager.webservice.db_models import ServersBase, ServersRead, Users
 from server_manager.webservice.docker_interface.docker_container_api import (
     docker_container_create,
+    docker_container_running,
     docker_container_start,
     docker_container_stop,
 )
@@ -75,5 +76,5 @@ async def get_server_status(server_id: int):
     server = DB().get_server(server_id)
     if not server:
         return {"running": False}
-    is_running = await docker_container_start(server.container_name)
+    is_running = await docker_container_running(server.container_name)
     return {"running": is_running}

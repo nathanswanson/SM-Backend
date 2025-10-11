@@ -271,6 +271,7 @@ async def docker_container_logs(container_name: str) -> Any:
     async with docker_container(container_name) as container:
         if container:
             log_buffer = ""
+            # TODO: timeout error fix
             async for chunk in container.log(stdout=True, stderr=True, follow=True):
                 log_buffer += chunk
                 while "\n" in log_buffer:

@@ -1,5 +1,7 @@
 *
 !.gitignore
+!.dockerignore
+!Dockerfile.dev
 !src/
 !src/**/*
 !tests/

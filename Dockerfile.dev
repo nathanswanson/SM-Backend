@@ -1,0 +1,15 @@
+
+FROM python:3.11-slim
+
+
+WORKDIR /app
+
+
+
+RUN pip install hatch debugpy
+COPY pyproject.toml README.md ./
+COPY src/server_manager/__about__.py /app/src/server_manager/__about__.py
+
+COPY . .
+RUN hatch env create
+RUN hatch run pip install -e .

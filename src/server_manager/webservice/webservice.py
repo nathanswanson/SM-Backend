@@ -23,13 +23,15 @@ from fastapi.routing import APIRoute
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
 
+from server_manager.webservice.db_models import UsersBase
 from server_manager.webservice.docker_interface.docker_container_api import (
     docker_container_name_exists,
     merge_streams,
 )
 from server_manager.webservice.routes import managment_api, nodes_api, search_api, server_api, template_api
 from server_manager.webservice.routes.containers import api, volumes_api
-from server_manager.webservice.util.auth import auth_get_active_user
+from server_manager.webservice.util.auth import auth_get_active_user, get_password_hash
+from server_manager.webservice.util.data_access import DB
 
 logging.basicConfig(
     level=logging.INFO,
@@ -57,19 +59,17 @@ app = FastAPI()
 
 # CORS middleware for local dev
 cors_allowed_origins = []
-if os.environ.get("SM_ENV") == "DEV":
-    logging.info("CORS middleware enabled")
-    cors_allowed_origins = ["http://localhost:4000", "https://admin.socket.io"]
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=cors_allowed_origins,
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-
+logging.info("CORS middleware enabled")
+cors_allowed_origins += ["http://localhost:4000", "https://admin.socket.io", f"https://{os.environ.get("SM_API_BACKEND")}"]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=cors_allowed_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+logging.info("CORS allowed origins: %s", cors_allowed_origins)
 oauth2_wrapper: dict = {}
-
 oauth2_wrapper = {"dependencies": [Depends(auth_get_active_user)]}
 api.router.include_router(volumes_api.router)
 app.include_router(api.router, **oauth2_wrapper, prefix="/container", tags=["container"])
@@ -80,7 +80,8 @@ app.include_router(server_api.router, **oauth2_wrapper, prefix="/server", tags=[
 app.include_router(nodes_api.router, **oauth2_wrapper, prefix="/nodes", tags=["nodes"])
 app.include_router(search_api.router, **oauth2_wrapper, prefix="/search", tags=["search"])
 # frontend
-app.mount("/", StaticFiles(directory=STATIC_PATH, html=True), name="static")
+if Path(STATIC_PATH) != Path("NULL"):
+    app.mount("/app", StaticFiles(directory=STATIC_PATH, html=True), name="static")
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
@@ -173,20 +174,19 @@ sio_app.start_background_task(process_all_rooms_task)
 
 
 # create a dev admin
-# if os.environ.get("SM_ENV") == "DEV":
-#     # create dev data
-#     if not DB().get_user_by_username("admin"):
-#         DB().create_user(
-#             Users(
-#                 username="admin",
-#                 id=None,
-#                 disabled=False,
-#                 admin=True,
-#                 hashed_password=get_password_hash("admin"),
-#             )
-#         )
-#     # dev.sql
-#     file_path = files("server_manager").joinpath("resources").joinpath("dev.sql")
-#     sql_text = file_path.read_text()
+if os.environ.get("SM_ENV") == "DEV" and not DB().get_user_by_username("admin"):
+    # create dev data
+
+    DB().create_user(
+        UsersBase(
+            username="admin",
+            disabled=False,
+            admin=True,
+            hashed_password=get_password_hash("admin"),
+        )
+    )
+    # # dev.sql
+    # file_path = files("server_manager").joinpath("resources").joinpath("dev.sql")
+    # sql_text = file_path.read_text()
 
 #     DB().exec_raw(sql_text)

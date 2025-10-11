@@ -30,8 +30,8 @@ async def login_user(form_data: Annotated[OAuth2PasswordRequestForm, Depends()])
         key="token",
         value=token.access_token,
         httponly=True,
-        secure=not dev_mode,
-        samesite="lax" if dev_mode else "strict",
+        secure=True,
+        samesite="none",
         max_age=token.expire_time,
     )
     return response
