@@ -81,7 +81,7 @@ app.include_router(nodes_api.router, **oauth2_wrapper, prefix="/nodes", tags=["n
 app.include_router(search_api.router, **oauth2_wrapper, prefix="/search", tags=["search"])
 # frontend
 if Path(STATIC_PATH) != Path("NULL"):
-    app.mount("/app", StaticFiles(directory=STATIC_PATH, html=True), name="static")
+    app.mount("/", StaticFiles(directory=STATIC_PATH, html=True), name="static")
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 
