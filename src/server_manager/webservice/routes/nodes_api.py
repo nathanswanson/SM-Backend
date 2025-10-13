@@ -6,13 +6,13 @@ API endpoints for node information like hardware, disk usage, runtime, ping
 Author: Nathan Swanson
 """
 
-import logging
 import re
 import subprocess
 
 from fastapi import APIRouter
 
 from server_manager.webservice.db_models import NodesBase, NodesRead
+from server_manager.webservice.logger import sm_logger
 from server_manager.webservice.models import NodeDiskUsageResponse, NodeUptimeResponse
 from server_manager.webservice.util.data_access import DB
 
@@ -55,7 +55,7 @@ def disk_usage(node_id: int):  # noqa: ARG001
     used_disk = int(output[2] or -1)
     total_disk = int(output[3] or -1)
     if used_disk < 0 or total_disk < 0:
-        logging.error("Error parsing disk usage output: %s", output)
+        sm_logger.error("Error parsing disk usage output: %s", output)
     return NodeDiskUsageResponse(used=used_disk, total=total_disk)
 
 
@@ -75,5 +75,5 @@ def runtime(node_id: int):  # noqa: ARG001
     try:
         return NodeUptimeResponse(uptime_hours=int(time))
     except (IndexError, ValueError):
-        logging.exception("Error parsing uptime output: %s", output)
+        sm_logger.exception("Error parsing uptime output: %s", output)
         return NodeUptimeResponse(uptime_hours=-1)

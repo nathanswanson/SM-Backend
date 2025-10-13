@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends
 
-from server_manager.webservice.db_models import ServersBase, ServersRead, Users
+from server_manager.webservice.db_models import Servers, ServersBase, ServersRead, Users
 from server_manager.webservice.docker_interface.docker_container_api import (
     docker_container_create,
     docker_container_running,
@@ -15,6 +15,7 @@ from server_manager.webservice.models import (
     ServerStatusResponse,
     ServerStopResponse,
 )
+from server_manager.webservice.net.server_router import ServerRouter
 from server_manager.webservice.util.auth import auth_get_active_user
 from server_manager.webservice.util.data_access import DB
 
@@ -22,16 +23,15 @@ router = APIRouter()
 
 
 @router.post("/", response_model=ServersRead)
-async def create_server(
-    server: ServersBase, template_id: int, node_id: int, current_user: Annotated[Users, Depends(auth_get_active_user)]
-):
+async def create_server(server: ServersBase, current_user: Annotated[Users, Depends(auth_get_active_user)]):  # noqa: ARG001 TODO: user association
     """Create a new server"""
     # create container of Servers.name name
     # start with template then override with server data if present
-    template = DB().get_template(template_id)
+    template = DB().get_template(server.template_id)
+    server.container_name = server.name
     if template:
-        await docker_container_create(server.name, template.image, server.port, server.env)
-        return DB().create_server(server, template_id, node_id, owner_id=current_user.id)
+        await docker_container_create(server.name, template.image, template.default_env or {} | server.env)
+        return DB().create_server(server)
     return {"success": False, "error": "Template not found"}
 
 
@@ -58,7 +58,10 @@ async def start_server(server_id: int):
     server = DB().get_server(server_id)
     if not server:
         return {"success": False, "error": "Server not found"}
-    return {"success": await docker_container_start(server.container_name)}
+    ret = await docker_container_start(server.container_name)
+    if ret:
+        ServerRouter().open_ports(server)
+    return {"success": ret}
 
 
 @router.post("/{server_id}/stop", response_model=ServerStopResponse)

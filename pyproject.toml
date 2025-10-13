@@ -21,7 +21,9 @@ dependencies = [
     "sqlmodel",
     "psycopg2-binary",
     "websockets",
+    "miniupnpc",
     "python-socketio",
+    "colorama",
 ]
 
 [project.scripts]
@@ -47,6 +49,10 @@ dependencies = [
     "pytest-asyncio",
     "websocket-client",
 ]
+
+[tool.hatch.envs.default.scripts]
+debug = "python -Xfrozen_modules=off -m debugpy --listen 0.0.0.0:5678  -m uvicorn src.server_manager.webservice.webservice:app --reload --host 0.0.0.0 --port 8000"
+
 
 # test
 [tool.hatch.envs.hatch-test]

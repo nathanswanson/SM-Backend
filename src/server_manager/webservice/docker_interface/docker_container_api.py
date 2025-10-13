@@ -9,8 +9,6 @@ Author: Nathan Swanson
 from __future__ import annotations
 
 import asyncio
-import logging
-import socket
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -22,6 +20,8 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from aiodocker.containers import DockerContainer
+
+from server_manager.webservice.logger import sm_logger
 
 banned_container_access = ["server-manager", "rproxy", "docker-socket-proxy", "postgres", "postgres_admin"]
 
@@ -103,6 +103,25 @@ async def docker_container_start(name: str) -> bool:
         return False
 
 
+async def docker_exposed_ports(name: str) -> list[int]:
+    """get a list of exposed ports from a container by name"""
+    if name in banned_container_access:
+        raise HTTPException(status_code=403, detail="Access to container denied")
+    async with docker_container(name) as container:
+        if container:
+            info = await container.show()
+            ports = info["NetworkSettings"]["Ports"]
+            exposed_ports: list[int] = []
+            for mappings in ports.values():
+                if mappings:
+                    try:
+                        exposed_ports.append(int(mappings[0]["HostPort"]))
+                    except (ValueError, KeyError, TypeError):
+                        continue
+            return exposed_ports
+        return []
+
+
 async def docker_container_running(name: str) -> bool:
     """check if a container is running by name"""
     if name in banned_container_access:
@@ -139,12 +158,6 @@ async def docker_stop_all_containers() -> None:
             await container.stop()
 
 
-def docker_port_is_free(port: int) -> bool:
-    """check if a port is free"""
-    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-        return s.connect_ex(("localhost", port)) != 0
-
-
 def _convert_ports(ports: dict[str, int | None]) -> dict[str, list[dict[str, str]] | None]:
     """convert ports to docker format"""
     values: dict[str, list[dict[str, str]] | None] = {}
@@ -153,9 +166,7 @@ def _convert_ports(ports: dict[str, int | None]) -> dict[str, list[dict[str, str
     return values
 
 
-async def docker_container_create(
-    container_name: str, image_name: str, ports: dict[str, int | None] | None, env: dict[str, str] | None
-) -> bool:
+async def docker_container_create(container_name: str, image_name: str, env: dict[str, str] | None) -> bool:
     """create a new container from an image"""
     async with docker_client() as client:
         try:
@@ -163,11 +174,8 @@ async def docker_container_create(
                 "Image": image_name,
                 "Tty": True,
                 "OpenStdin": True,
+                "NetworkingConfig": {"EndpointsConfig": {"builder_servers": {}}},  # TODO: not called builder_*
             }
-            if ports:
-                container_args["HostConfig"] = {"PortBindings": _convert_ports(ports)}
-            else:
-                container_args["HostConfig"] = {"PublishAllPorts": True}
 
             if env:
                 env_string: list[str] = []
@@ -300,7 +308,7 @@ async def merge_streams() -> AsyncGenerator[Message, None]:
                             async for msg in stream(container_name):
                                 await queue.put(Message(data=msg, room=f"01+{container_name}", event_type=command))
                         except asyncio.CancelledError:
-                            logging.debug("Stream for %s cancelled", container_name)
+                            sm_logger.debug("Stream for %s cancelled", container_name)
                             if container_name in tasks:
                                 tasks.pop(container_name).cancel_all()
 

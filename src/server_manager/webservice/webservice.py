@@ -7,7 +7,6 @@ Author: Nathan Swanson
 """
 
 import asyncio
-import logging
 import os
 import sys
 from collections.abc import AsyncGenerator, Callable
@@ -16,6 +15,7 @@ from enum import StrEnum
 from pathlib import Path
 
 import socketio
+from colorama import Fore
 from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
@@ -23,44 +23,51 @@ from fastapi.routing import APIRoute
 from fastapi.security import OAuth2PasswordBearer
 from fastapi.staticfiles import StaticFiles
 
-from server_manager.webservice.db_models import UsersBase
+from server_manager.webservice.db_models import Users
 from server_manager.webservice.docker_interface.docker_container_api import (
     docker_container_name_exists,
     merge_streams,
 )
+from server_manager.webservice.logger import sm_logger
 from server_manager.webservice.routes import managment_api, nodes_api, search_api, server_api, template_api
 from server_manager.webservice.routes.containers import api, volumes_api
 from server_manager.webservice.util.auth import auth_get_active_user, get_password_hash
 from server_manager.webservice.util.data_access import DB
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(message)s",
-    datefmt="[%X]",
+sm_logger.log_group(
+    "Starting server-manager webservice",
+    [
+        f"Python version: {sys.version.split()[0]}",
+        f"OS: {os.name}, Platform: {os.uname().sysname}",
+        f"Process ID: {os.getpid()}",
+        f"Log Level: {os.environ.get('SM_LOG_LEVEL', 'INFO')} (SM_LOG_LEVEL)",
+        f"Log Path: {os.environ.get('SM_LOG_PATH', 'stdout')} (SM_LOG_PATH)",
+        f"Environment: {os.environ.get('SM_ENV', 'PROD')} (SM_ENV)",
+        f"Port Range: {os.environ.get('SM_PORT_START', '30000')}-{os.environ.get('SM_PORT_END', '30100')} (SM_PORT_START and SM_PORT_END)",
+        f"Static Path: {os.environ.get('SM_STATIC_PATH', 'NULL')} (SM_STATIC_PATH)",
+        f"URL: {Fore.BLUE}https://{os.environ.get('SM_API_BACKEND', 'localhost')}{Fore.RESET} (SM_API_BACKEND)",
+    ],
 )
-
 if os.environ.get("SM_ENV") == "DEV":
-    logging.debug("Debug logging enabled")
-
+    sm_logger.warning("Running in DEV mode, this is not recommended for production use.")
 try:
     STATIC_PATH = os.environ["SM_STATIC_PATH"]
 except KeyError as e:
-    logging.critical("Env var %s is missing. Is the .env missing?", e.args)
+    sm_logger.critical("Env var %s is missing. Is the .env missing?", e.args)
     sys.exit(1)
-else:
-    logging.info("frontend server files path: %s", STATIC_PATH)
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
-log_path = Path(__file__).resolve().parent.parent / "logs"
-Path(log_path).mkdir(parents=True, exist_ok=True)
 
 # main app - gets overridden by socket io app at end of file
 app = FastAPI()
 
 # CORS middleware for local dev
 cors_allowed_origins = []
-logging.info("CORS middleware enabled")
-cors_allowed_origins += ["http://localhost:4000", "https://admin.socket.io", f"https://{os.environ.get("SM_API_BACKEND")}"]
+sm_logger.info("CORS middleware enabled")
+cors_allowed_origins += [
+    "https://admin.socket.io",
+    f"https://{os.environ.get('SM_API_BACKEND')}",
+]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_allowed_origins,
@@ -68,7 +75,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-logging.info("CORS allowed origins: %s", cors_allowed_origins)
+sm_logger.debug("CORS allowed origins: %s", cors_allowed_origins)
 oauth2_wrapper: dict = {}
 oauth2_wrapper = {"dependencies": [Depends(auth_get_active_user)]}
 api.router.include_router(volumes_api.router)
@@ -104,12 +111,17 @@ sio_app = socketio.AsyncServer(
     cors_allowed_origins=cors_allowed_origins,
 )
 app = socketio.ASGIApp(sio_app, app)
-sio_app.instrument(
-    auth={
-        "username": "admin",
-        "password": "password",
-    }
-)
+if os.environ.get("SM_ENV") == "DEV":
+    sio_app.instrument(
+        auth={
+            "username": "admin",
+            "password": "password",
+        }
+    )
+    sm_logger.info(
+        f"Socket.io admin panel enabled at\n{Fore.BLUE}https://admin.socket.io/?username=admin&server=http://%s/socket.io/{Fore.RESET}",
+        os.environ.get("SM_API_BACKEND"),
+    )
 
 
 def check_empty_room(room: str):
@@ -178,15 +190,11 @@ if os.environ.get("SM_ENV") == "DEV" and not DB().get_user_by_username("admin"):
     # create dev data
 
     DB().create_user(
-        UsersBase(
+        Users(
+            id=1,
             username="admin",
             disabled=False,
             admin=True,
             hashed_password=get_password_hash("admin"),
         )
     )
-    # # dev.sql
-    # file_path = files("server_manager").joinpath("resources").joinpath("dev.sql")
-    # sql_text = file_path.read_text()
-
-#     DB().exec_raw(sql_text)

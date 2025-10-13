@@ -8,10 +8,12 @@ Author: Nathan Swanson
 
 import os
 from collections.abc import Sequence
-from typing import Optional, cast
+from typing import cast
 
 import sqlalchemy.exc
 import sqlmodel
+from fastapi import HTTPException
+from pydantic import ValidationError
 from sqlmodel import Session, SQLModel, create_engine
 
 from server_manager.webservice.db_models import (
@@ -46,35 +48,21 @@ class DB(metaclass=SingletonMeta):
             return obj
 
     # server
-    def create_server(
-        self, server: ServersBase, template_id: int, node_id: int, owner_id: Optional[int] = None
-    ) -> Servers:
+    def create_server(self, server: ServersBase) -> Servers:
         with Session(self._engine) as session:
             server = Servers.model_validate(server)
             session.add(server)
-            if owner_id:
-                owner = session.get(Users, owner_id)
-                if owner:
-                    server.linked_users.append(owner)
-            if template_id:
-                template = session.get(Templates, template_id)
-                if template:
-                    server.server_template = template
-            if node_id:
-                node = session.get(Nodes, node_id)
-                if node:
-                    server.server_node = node
             session.commit()
             session.refresh(server)
             return server
 
-    def get_server(self, server_id: int | str) -> ServersRead | None:
+    def get_server(self, server_id: int | str) -> Servers | None:
         with Session(self._engine) as session:
             if isinstance(server_id, int) or server_id.isdigit():
                 statement = sqlmodel.select(Servers).where(Servers.id == int(server_id))
             else:
                 statement = sqlmodel.select(Servers).where(Servers.name == server_id)
-            return cast(ServersRead | None, session.exec(statement).first())
+            return session.exec(statement).first()
 
     def get_server_list(self, owner: Users) -> Sequence[ServersRead]:
         with Session(self._engine) as session:
@@ -94,7 +82,7 @@ class DB(metaclass=SingletonMeta):
         return False
 
     # user
-    def create_user(self, user: UsersBase) -> UsersRead:
+    def create_user(self, user: UsersBase | Users) -> UsersRead:
         with Session(self._engine) as session:
             user.admin = False  # admins must be added manually
             user = Users.model_validate(user)
@@ -125,10 +113,14 @@ class DB(metaclass=SingletonMeta):
 
     def create_template(self, template: TemplatesBase):
         with Session(self._engine) as session:
-            session.add(template)
-            session.commit()
-            session.refresh(template)
-            return cast(TemplatesRead, template)
+            try:
+                mapped_template = Templates.model_validate(template)
+                session.add(mapped_template)
+                session.commit()
+                session.refresh(mapped_template)
+            except ValidationError as e:
+                raise HTTPException(status_code=500, detail=f"failed to validate Template error: {e}") from e
+            return mapped_template
 
     def get_template(self, template_id: int) -> Templates | None:
         with Session(self._engine) as session:

@@ -1,6 +1,7 @@
 from typing import Optional
 
-from sqlalchemy import JSON, Column
+from sqlalchemy import JSON, Column, Integer
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlmodel import Field, Relationship, SQLModel
 
 
@@ -24,6 +25,7 @@ class TemplatesBase(SQLModel):
         description='JSON string of "Modules" that will be added to server creator UI',
         sa_column=Column(JSON),
     )
+
     resource_min_cpu: int | None = Field(description="Minimum CPU resources required")
     resource_min_disk: int | None = Field(description="Minimum Disk resources required")
     resource_min_mem: int | None = Field(description="Minimum Memory resources required")
@@ -31,8 +33,15 @@ class TemplatesBase(SQLModel):
 
 class Templates(TemplatesBase, table=True):
     # sql specific
-    id: Optional[int] = Field(primary_key=True, nullable=False, unique=True, description="Template ID")
+    id: int | None = Field(primary_key=True, default=None, description="Template ID")
     linked_servers: list["Servers"] = Relationship(back_populates="server_template")
+    exposed_port: list[int] = Field(
+        description="List of ports exposed by the template", sa_column=Column(ARRAY(Integer))
+    )
+
+
+class TemplatesCreate(TemplatesBase):
+    pass
 
 
 class TemplatesRead(TemplatesBase):
@@ -52,6 +61,10 @@ class Users(UsersBase, table=True):
 
     # private fields
     hashed_password: str
+
+
+class UsersCreate(UsersBase):
+    pass
 
 
 class UsersRead(UsersBase):
@@ -75,6 +88,10 @@ class Nodes(NodesBase, table=True):
     child_servers: list["Servers"] = Relationship(back_populates="server_node")
 
 
+class NodesCreate(NodesBase):
+    pass
+
+
 class NodesRead(NodesBase):
     id: int
 
@@ -88,26 +105,26 @@ class ServersBase(SQLModel):
     cpu: int | None = Field(description="CPU resources allocated to the server")
     disk: int | None = Field(description="Disk space allocated to the server in GB")
     memory: int | None = Field(description="Memory allocated to the server in GB")
-    port: dict[str, int | None] | None = Field(
-        default=None,
-        description="List of ports exposed by the server",
-        sa_column=Column(JSON),
-    )
     container_name: str = Field(description="Docker container name for the server", default="")
+    node_id: int = Field(foreign_key="nodes.id")
+    template_id: int = Field(foreign_key="templates.id")
 
 
 class Servers(ServersBase, table=True):
     # sql specific
-    id: Optional[int] = Field(primary_key=True, unique=True, description="Server ID")
+    id: Optional[int] = Field(primary_key=True, default=None, description="Server ID")
     server_node: "Nodes" = Relationship(back_populates="child_servers")
     server_template: "Templates" = Relationship(back_populates="linked_servers")
     linked_users: list[Users] = Relationship(back_populates="linked_servers", link_model=ServerUserLink)
+    port: Optional[list[int]] = Field(description="List of port exposed by proxy", sa_column=Column(ARRAY(Integer)))
 
-    node_id: int = Field(foreign_key="nodes.id")
-    template_id: int = Field(foreign_key="templates.id")
+
+class ServersCreate(ServersBase):
+    pass
 
 
 class ServersRead(ServersBase):
     id: int
     node_id: int = Field(foreign_key="nodes.id")
     template_id: int = Field(foreign_key="templates.id")
+    port: list[int]
