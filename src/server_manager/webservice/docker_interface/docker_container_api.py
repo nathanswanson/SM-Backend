@@ -9,6 +9,7 @@ Author: Nathan Swanson
 from __future__ import annotations
 
 import asyncio
+import os
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -16,10 +17,14 @@ from typing import TYPE_CHECKING, Any
 import aiodocker
 from fastapi import HTTPException
 
+from server_manager.webservice.docker_interface.docker_image_api import docker_get_image_exposed_volumes
+
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator
 
     from aiodocker.containers import DockerContainer
+
+from pydantic import BaseModel, ConfigDict, Field
 
 from server_manager.webservice.logger import sm_logger
 
@@ -84,9 +89,10 @@ async def docker_container_remove(name: str) -> bool:
     """remove a container by name"""
     if name in banned_container_access:
         raise HTTPException(status_code=403, detail="Access to container denied")
+    if await docker_container_running(name):
+        await docker_container_stop(name)
     async with docker_container(name) as container:
         if container:
-            await container.stop()
             await container.delete()
             return True
         return False
@@ -101,6 +107,7 @@ async def docker_container_start(name: str) -> bool:
             await container.start()
             return True
         return False
+    return False
 
 
 async def docker_exposed_ports(name: str) -> list[int]:
@@ -158,15 +165,22 @@ async def docker_stop_all_containers() -> None:
             await container.stop()
 
 
-def _convert_ports(ports: dict[str, int | None]) -> dict[str, list[dict[str, str]] | None]:
-    """convert ports to docker format"""
-    values: dict[str, list[dict[str, str]] | None] = {}
-    for int_port, out_port in ports.items():
-        values[int_port] = [{"HostPort": str(out_port)}] if out_port else [{}]
-    return values
+async def map_image_volumes(image_name: str, container_name: str) -> list[str]:
+    """map image volumes to host volumes"""
+    exposed_volumes = await docker_get_image_exposed_volumes(image_name)
+    mount_path = os.environ.get("SM_MOUNT_PATH", "/mnt/server_manager")
+    if exposed_volumes:
+        return [f"{os.path.abspath(mount_path)}/{container_name}{vol}:{vol}" for vol in exposed_volumes]
+    return []
 
 
-async def docker_container_create(container_name: str, image_name: str, env: dict[str, str] | None) -> bool:
+async def docker_container_create(
+    container_name: str,
+    image_name: str,
+    env: dict[str, str] | None,
+    server_link: str | None = None,
+    user_link: str | None = None,
+) -> bool:
     """create a new container from an image"""
     async with docker_client() as client:
         try:
@@ -175,19 +189,68 @@ async def docker_container_create(container_name: str, image_name: str, env: dic
                 "Tty": True,
                 "OpenStdin": True,
                 "NetworkingConfig": {"EndpointsConfig": {"builder_servers": {}}},  # TODO: not called builder_*
+                "HostConfig": {"Binds": await map_image_volumes(image_name, container_name)},
             }
 
+            if server_link:
+                container_args["Labels"] = {"online.nathanswanson.server_link": server_link}
+
+            if user_link:
+                if "Labels" not in container_args:
+                    container_args["Labels"] = {}
+                container_args["Labels"]["online.nathanswanson.user_link"] = user_link
             if env:
                 env_string: list[str] = []
                 for item_key, item_val in env.items():
                     env_string.append(f"{item_key}={item_val}")
                 container_args["Env"] = env_string
-            container = await client.containers.create(name=container_name, config=container_args)
-            await container.start()
+            # create the folders for the volumes
+            for volume in container_args["HostConfig"]["Binds"]:
+                host_path = volume.split(":")[0]
+                os.makedirs(host_path, exist_ok=True)
+                if not os.access(host_path, os.W_OK):
+                    sm_logger.error(f"Volume path {host_path} is not writable. Please check permissions.")
+                    return False
+            await client.containers.create(name=container_name, config=container_args)
         except aiodocker.exceptions.DockerError:
             return False
         else:
             return True
+
+
+class HealthInfo(BaseModel):
+    model_config = ConfigDict(strict=True)
+
+    start: str = Field(alias="Start")
+    end: str = Field(alias="End")
+    exit_code: int = Field(alias="ExitCode")
+    output: str = Field(alias="Output")
+
+
+async def docker_container_health_status(container_name: str) -> str:
+    """get the health status of a container"""
+    if container_name in banned_container_access:
+        raise HTTPException(status_code=403, detail="Access to container denied")
+    health_data = await docker_container_inspect(container_name)
+    return health_data.output if health_data else "Health Check N/A"
+
+
+async def docker_container_inspect(container_name: str) -> HealthInfo | None:
+    """inspect a container"""
+    if container_name in banned_container_access:
+        raise HTTPException(status_code=403, detail="Access to container denied")
+    if not await docker_container_running(container_name):
+        raise HTTPException(status_code=400, detail=f"Container '{container_name}' is not running")
+
+    async with docker_container(container_name) as container:
+        if container:
+            info = await container.show()
+            health_logs = info["State"].get("Health")
+            if len(health_logs) == 0:
+                return None
+            health_data = info["State"]["Health"]["Log"][-1]
+            return HealthInfo.model_validate(health_data)
+    return None
 
 
 async def docker_container_metrics(container_name: str) -> AsyncGenerator[str]:

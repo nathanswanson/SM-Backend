@@ -10,7 +10,7 @@ from rich.console import Console
 from server_manager.__about__ import __version__
 from server_manager.webservice.logger import LOG_CONFIG
 from server_manager.webservice.util.auth import create_user
-from server_manager.webservice.webservice import app
+from server_manager.webservice.webservice import fastapi_app
 
 console = Console()
 
@@ -20,7 +20,7 @@ console = Console()
 @click.pass_context
 def server_manager(ctx):
     if not ctx.invoked_subcommand:
-        uvicorn.run(app, log_config=LOG_CONFIG, host="0.0.0.0", port=8000)  # noqa: S104
+        uvicorn.run(fastapi_app, log_config=LOG_CONFIG, host="0.0.0.0", port=8000)  # noqa: S104
 
 
 @server_manager.command("generate")

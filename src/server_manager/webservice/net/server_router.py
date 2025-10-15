@@ -29,18 +29,6 @@ class ServerRouter(metaclass=SingletonMeta):
     def __init__(self):
         # add empty servers {} to layer4
         requests.post(f"{CADDY_URL}/config/apps/layer4/servers", json={}, timeout=5)
-        self.used_ports: set[int] = set()
-
-    def allocate_port(self) -> int | None:
-        for port in range(start_port, end_port + 1):
-            if port not in self.used_ports:
-                self.used_ports.add(port)
-                return port
-        sm_logger.error("No available ports in the range %d-%d", start_port, end_port)
-        return None
-
-    def release_port(self, port: int):
-        self.used_ports.discard(port)
 
     def add_caddy_route(self, container_name: str, port_mappings: dict[int, int]):
         # Function to add a Caddy route for the given container
@@ -89,16 +77,16 @@ class ServerRouter(metaclass=SingletonMeta):
             return response.status_code == HTTPStatus.OK
         return False
 
-    def delete_caddy_route(self, container_name: str) -> bool:
+    def close_ports(self, server: Servers) -> bool:
         try:
-            response = requests.delete(_container_exists_config_url(container_name), timeout=5)
+            response = requests.delete(_container_exists_config_url(server.container_name), timeout=5)
         except requests.RequestException:
-            sm_logger.exception("Error deleting Caddy route for container: %s", container_name)
+            sm_logger.exception("Error deleting Caddy route for container: %s", server.container_name)
             return False
         else:
             return response.status_code == HTTPStatus.OK
 
-    def open_ports(self, server: Servers) -> bool:
+    async def open_ports(self, server: Servers) -> bool:
         # docker -> caddy no port forward, docker network instead.
         # exposed ports should not be changed. minecraft example:
         # exposed (internal)25565 -> (docker net)25565 -> (caddy)30050
@@ -108,7 +96,12 @@ class ServerRouter(metaclass=SingletonMeta):
             sm_logger.warning("Server %s has no ports to open.", server.name)
             return False
         template = DB().get_template(server.template_id)
-        if docker_container_name_exists(server.container_name) and template and template.exposed_port and server.port:
+        if (
+            await docker_container_name_exists(server.container_name)
+            and template
+            and template.exposed_port
+            and server.port
+        ):
             try:
                 return self.add_caddy_route(
                     server.container_name, dict(zip(template.exposed_port, server.port, strict=True))

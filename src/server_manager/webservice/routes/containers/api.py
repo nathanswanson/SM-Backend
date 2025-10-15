@@ -22,30 +22,6 @@ router = APIRouter()
 metric_data_rate = 10
 
 
-# async def list_containers():
-#     """list all container names"""
-#     names = await docker_list_containers_names()
-#     return ContainerListResponse(items=names)
-
-
-# async def start_container(name: str):
-#     """start a container by name"""
-#     ret = await docker_container_start(name)
-#     return ContainerStartResponse(success=ret)
-
-
-# async def stop_container(name: str):
-#     """stop a container by name"""
-#     ret = await docker_container_stop(name)
-#     return ContainerStopResponse(success=ret)
-
-
-# async def get_container_status(container_name: str):
-#     """get container running status"""
-#     is_running = await docker_container_running(container_name)
-#     return ContainerStatusResponse(running=is_running)
-
-
 @router.get("/{container_name}/logs", response_model=ContainerLogsResponse)
 async def get_log_message(container_name: str, line_count: int | None = None) -> ContainerLogsResponse:
     """get the last line_count lines of container logs, defaults to 25 if not specified"""

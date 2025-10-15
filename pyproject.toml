@@ -17,7 +17,6 @@ dependencies = [
     "cryptography",
     "aiodocker",
     "pyJWT",
-    "docker",
     "sqlmodel",
     "psycopg2-binary",
     "websockets",

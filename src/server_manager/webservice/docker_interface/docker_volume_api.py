@@ -66,3 +66,8 @@ async def docker_delete_file(container_name: str, path: str) -> bool:
             await container.exec(f"rm -rf {path}")
             return True
     return False
+
+
+def docker_volume_path(container_name: str, path: str) -> str:
+    """get the full path to a file in a container"""
+    return f"{os.environ['SM_MOUNT_PATH']}/{container_name}/{path.lstrip('/')}"

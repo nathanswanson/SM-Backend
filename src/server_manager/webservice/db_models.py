@@ -110,13 +110,16 @@ class ServersBase(SQLModel):
     template_id: int = Field(foreign_key="templates.id")
 
 
-class Servers(ServersBase, table=True):
+class Servers(
+    ServersBase,
+    table=True,
+):
     # sql specific
     id: Optional[int] = Field(primary_key=True, default=None, description="Server ID")
     server_node: "Nodes" = Relationship(back_populates="child_servers")
     server_template: "Templates" = Relationship(back_populates="linked_servers")
     linked_users: list[Users] = Relationship(back_populates="linked_servers", link_model=ServerUserLink)
-    port: Optional[list[int]] = Field(description="List of port exposed by proxy", sa_column=Column(ARRAY(Integer)))
+    port: list[int] = Field(description="List of port exposed by proxy", sa_column=Column(ARRAY(Integer)))
 
 
 class ServersCreate(ServersBase):

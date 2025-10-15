@@ -52,6 +52,7 @@ class ServerStopResponse(SuccessModel):
 
 class ServerStatusResponse(BaseModel):
     running: bool
+    health: str | None = None
 
 
 ## Containers

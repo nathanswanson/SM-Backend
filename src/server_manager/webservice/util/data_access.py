@@ -14,7 +14,7 @@ import sqlalchemy.exc
 import sqlmodel
 from fastapi import HTTPException
 from pydantic import ValidationError
-from sqlmodel import Session, SQLModel, create_engine
+from sqlmodel import Session, SQLModel, create_engine, func, select
 
 from server_manager.webservice.db_models import (
     Nodes,
@@ -47,10 +47,30 @@ class DB(metaclass=SingletonMeta):
             session.refresh(obj)
             return obj
 
-    # server
-    def create_server(self, server: ServersBase) -> Servers:
+    def unused_port(self, count: int = 1) -> list[int] | None:
+        used_port = set()
+
         with Session(self._engine) as session:
-            server = Servers.model_validate(server)
+            all_ports = select(
+                func.generate_series(int(os.environ["SM_PORT_START"]), int(os.environ["SM_PORT_END"])).label("port")
+            ).subquery("all_ports")
+
+            used_ports = select(
+                func.unnest(Servers.port).label("port"),
+            ).subquery("used_ports")
+
+            statement = (
+                select(all_ports.c.port).except_(select(used_ports.c.port)).order_by(all_ports.c.port).limit(count)
+            )
+            results = session.exec(statement).all()
+            return [port_tuple[0] for port_tuple in results]
+
+        return None
+
+    # server
+    def create_server(self, server: ServersBase, **kwargs) -> Servers:
+        with Session(self._engine) as session:
+            server = Servers.model_validate(server, update=kwargs)
             session.add(server)
             session.commit()
             session.refresh(server)
@@ -78,6 +98,7 @@ class DB(metaclass=SingletonMeta):
             server_obj = session.get(Servers, server_id)
             if server_obj is not None:
                 session.delete(server_obj)
+                session.commit()
                 return True
         return False
 
