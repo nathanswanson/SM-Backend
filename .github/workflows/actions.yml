@@ -17,9 +17,6 @@ permissions:
 
 jobs:
   build:
-    defaults:
-      run:
-        working-directory: ./SM-Backend
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -39,4 +36,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: server-manager-backend
-          path: ./SM-Backend/dist/*.whl
+          path: dist/*.whl
