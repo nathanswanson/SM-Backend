@@ -4,8 +4,12 @@
 name: Python application
 
 on:
-  workflow_call:
   workflow_dispatch:
+    inputs:
+      version:
+        description: "tagged version for SM-Frontend Release"
+        required: true
+        type: string
 
 permissions:
   contents: read
