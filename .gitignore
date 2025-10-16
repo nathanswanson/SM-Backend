@@ -8,6 +8,7 @@
 !pyproject.toml
 !README.md
 !ruff.toml
+!.github
 !.github/**
 
 __pycache__/
