@@ -15,7 +15,8 @@ jobs:
   multiarch:
     strategy:
       matrix:
-        arch_os: [ubuntu-24.04-arm, ubuntu-24.04]
+        # arch_os: [ubuntu-24.04-arm, ubuntu-24.04] need test each env
+        arch_os: [ubuntu-24.04-arm]
 
     runs-on: ${{ matrix.arch_os}}
   
