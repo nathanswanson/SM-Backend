@@ -33,8 +33,7 @@ async def create_server(server: ServersBase, current_user: Annotated[Users, Depe
     template = DB().get_template(server.template_id)
     server.container_name = server.name
     # make sure server doesn't already exist
-    if DB().get_server(server.name):
-        raise HTTPException(status_code=400, detail="Server with this name already exists")
+
     if template:
         docker_ret = await docker_container_create(
             server.name, template.image, template.default_env or {} | server.env, server_link=server.name
@@ -49,7 +48,7 @@ async def create_server(server: ServersBase, current_user: Annotated[Users, Depe
 
 
 @router.get("/{server_id}", response_model=ServersRead)
-async def get_server_info(server_id: int | str):
+async def get_server_info(server_id: int):
     """Get information about a specific server"""
     server = DB().get_server(server_id)
     if not server:

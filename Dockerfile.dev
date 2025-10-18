@@ -1,12 +1,13 @@
 
-FROM python:3.11-slim
-
+FROM ubuntu:25.04
 
 WORKDIR /app
 
 
+RUN apt-get update && apt-get install -y python3 python3-pip python3-debugpy make
 
-RUN pip install hatch debugpy
+RUN pip install hatch --break-system-packages
+
 COPY pyproject.toml README.md ./
 COPY src/server_manager/__about__.py /app/src/server_manager/__about__.py
 

@@ -42,10 +42,10 @@ sm_logger.debug("CORS allowed origins: %s", cors_allowed_origins)
 # routers
 oauth2_wrapper: dict = {"dependencies": [Depends(auth_get_active_user)]}
 api.router.include_router(volumes_api.router)
-fastapi_app.include_router(api.router, **oauth2_wrapper, prefix="/container", tags=["container"])
-fastapi_app.include_router(template_api.router, **oauth2_wrapper, prefix="/template", tags=["template"])
-fastapi_app.include_router(managment_api.router, prefix="/system", tags=["system"])
-fastapi_app.include_router(server_api.router, **oauth2_wrapper, prefix="/server", tags=["server"])
+fastapi_app.include_router(api.router, **oauth2_wrapper, prefix="/containers", tags=["containers"])
+fastapi_app.include_router(template_api.router, **oauth2_wrapper, prefix="/templates", tags=["templates"])
+fastapi_app.include_router(managment_api.router, prefix="/users", tags=["users"])
+fastapi_app.include_router(server_api.router, **oauth2_wrapper, prefix="/servers", tags=["servers"])
 fastapi_app.include_router(nodes_api.router, **oauth2_wrapper, prefix="/nodes", tags=["nodes"])
 fastapi_app.include_router(search_api.router, **oauth2_wrapper, prefix="/search", tags=["search"])
 # frontend

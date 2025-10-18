@@ -48,7 +48,6 @@ class DB(metaclass=SingletonMeta):
             return obj
 
     def unused_port(self, count: int = 1) -> list[int] | None:
-        used_port = set()
 
         with Session(self._engine) as session:
             all_ports = select(
@@ -76,12 +75,9 @@ class DB(metaclass=SingletonMeta):
             session.refresh(server)
             return server
 
-    def get_server(self, server_id: int | str) -> Servers | None:
+    def get_server(self, server_id: int) -> Servers | None:
         with Session(self._engine) as session:
-            if isinstance(server_id, int) or server_id.isdigit():
-                statement = sqlmodel.select(Servers).where(Servers.id == int(server_id))
-            else:
-                statement = sqlmodel.select(Servers).where(Servers.name == server_id)
+            statement = sqlmodel.select(Servers).where(Servers.id == server_id)
             return session.exec(statement).first()
 
     def get_server_list(self, owner: Users) -> Sequence[ServersRead]:

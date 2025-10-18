@@ -18,6 +18,13 @@ from server_manager.webservice.util.data_access import DB
 router = APIRouter()
 
 
+@router.post("/", response_model=TemplateCreateResponse)
+def add_template(template: TemplatesBase):
+    """add a new template"""
+    ret = DB().create_template(template)
+    return TemplateCreateResponse(success=ret is not None)
+
+
 @router.get("/{template_id}", response_model=TemplatesRead)
 def get_template(template_id: int):
     """get a template by id"""
@@ -26,12 +33,6 @@ def get_template(template_id: int):
         return template
     raise HTTPException(status_code=404, detail="Template not found")
 
-
-@router.post("/create", response_model=TemplateCreateResponse)
-def add_template(template: TemplatesBase):
-    """add a new template"""
-    ret = DB().create_template(template)
-    return TemplateCreateResponse(success=ret is not None)
 
 
 @router.delete("/{name}/delete", response_model=TemplateDeleteResponse)

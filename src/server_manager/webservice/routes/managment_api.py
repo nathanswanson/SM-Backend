@@ -21,6 +21,13 @@ router = APIRouter()
 dev_mode = os.environ.get("SM_ENV") == "DEV"
 
 
+
+
+@router.post("/", response_model=UsersBase)
+async def create_user_account(create_user_request: CreateUserRequest):
+    """create a new user account"""
+    return create_user(create_user_request.username, create_user_request.password.get_secret_value())
+
 @router.post("/token")
 async def login_user(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
     """login user, return access token in cookie"""
@@ -37,20 +44,15 @@ async def login_user(form_data: Annotated[OAuth2PasswordRequestForm, Depends()])
     return response
 
 
-@router.post("/create", response_model=UsersBase)
-async def create_user_account(create_user_request: CreateUserRequest):
-    """create a new user account"""
-    return create_user(create_user_request.username, create_user_request.password.get_secret_value())
-
-
 @router.post("/revoke", dependencies=[Depends(auth_get_active_user)])
 async def logout_user(response: Response, _current_user: Annotated[Users, Depends(auth_get_active_user)]):
+    """logout user, delete access token cookie"""
     response.delete_cookie(key="token", httponly=True, secure=not dev_mode, samesite="lax" if dev_mode else "strict")
     # return response with message
     return JSONResponse(headers=response.headers, content={"message": "Logout successful"})
 
 
-@router.post("/me", response_model=UsersBase, dependencies=[Depends(auth_get_active_user)])
+@router.get("/me", response_model=UsersBase, dependencies=[Depends(auth_get_active_user)])
 async def get_user(current_user: Annotated[Users, Depends(auth_get_active_user)]):
     """get current user information"""
     return current_user

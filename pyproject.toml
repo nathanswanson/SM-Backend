@@ -23,6 +23,7 @@ dependencies = [
     "miniupnpc",
     "python-socketio",
     "colorama",
+    "requests",
 ]
 
 [project.scripts]
