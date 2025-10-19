@@ -18,14 +18,18 @@ if TYPE_CHECKING:
     from io import BytesIO
 
 
-async def docker_list_directory(container_name: str, path: str) -> list[str] | None:
+async def docker_list_directory(container_name: str, path: str) -> tuple[list[str], list[str]] | None:
     """list files in a directory inside a container"""
     async with docker_container(container_name) as container:
         if container:
-            exec_log = await container.exec(["ls", "-p", path], workdir="/")
-            response = await exec_log.start().read_out()
-            if response:
-                return response.data.decode("utf-8").split()
+            exec_log_files = await container.exec(["find", path, '-maxdepth','1','-type', 'f', '-printf', '%P\n'], workdir="/")
+            exec_log_dirs = await container.exec(["find", path, '-maxdepth','1','-type', 'd', '-printf', '%P\n'], workdir="/")
+            response_files = await exec_log_files.start().read_out()
+            response_dirs = await exec_log_dirs.start().read_out()
+            if response_files and response_dirs:
+                files = response_files.data.decode("utf-8").split()
+                dirs = response_dirs.data.decode("utf-8").split()
+                return files, dirs
     return None
 
 

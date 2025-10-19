@@ -23,6 +23,7 @@ router = APIRouter()
 @router.get("/{container_name}/fs")
 async def read_file(container_name: str, path: str):
     """read a file in a container volume, returns a tar archive of the file"""
+
     gen = docker_read_file(container_name=container_name, path=path)
     archive_size = await anext(gen)
     archive_size = int.from_bytes(archive_size, "big")

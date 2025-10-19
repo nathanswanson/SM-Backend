@@ -9,7 +9,7 @@ Author: Nathan Swanson
 import re
 import subprocess
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
 
 from server_manager.webservice.db_models import NodesBase, NodesRead
 from server_manager.webservice.logger import sm_logger
@@ -20,6 +20,7 @@ router = APIRouter()
 _runtime_pattern = re.compile(
     r"^\s*\d+:\d+:\d+ up (\d+) days?,\s+(\d+):\d+,\s+\d+\susers?,\s+load\s+average:\s+\d\.\d\d,\s+\d\.\d\d,\s+\d\.\d\d"
 )
+
 
 
 @router.post("/", response_model=NodesRead)
@@ -35,7 +36,10 @@ def add_node(node: NodesBase) -> NodesRead | None:
 def get_node(node_id: int) -> NodesRead | None:
     """return hardware information in form of a Nodes object
     fields: id, name, architecture, cpu_cores, memory, disk, cpu_name"""
-    return DB().get_node(node_id)
+    ret = DB().get_node(node_id)
+    if ret is None:
+        raise HTTPException(status_code=404, detail="Node not found")
+    return ret
 
 
 @router.delete("/{node_id}")

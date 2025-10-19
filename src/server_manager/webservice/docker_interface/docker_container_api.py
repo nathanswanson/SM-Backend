@@ -328,7 +328,11 @@ async def docker_container_logs_tail(container_name: str, tail: int) -> list[str
     if container_name in banned_container_access:
         raise HTTPException(status_code=403, detail="Access to container denied")
     client = aiodocker.Docker()
-    container: DockerContainer = await client.containers.get(container_name)
+    try:
+        container: DockerContainer = await client.containers.get(container_name)
+    except aiodocker.DockerError as e:
+        sm_logger.error("Failed to Find docker container %s", container_name)
+        raise HTTPException(status_code=404, detail=f"Failed to find container '{container_name }'") from e
     logs = await container.log(tail=tail, stdout=True, stderr=True)
     lines: list[str] = []
     for chunk in logs:

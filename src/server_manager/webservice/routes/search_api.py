@@ -6,8 +6,8 @@ from server_manager.webservice.db_models import Users
 from server_manager.webservice.docker_interface.docker_container_api import docker_container_running
 from server_manager.webservice.docker_interface.docker_volume_api import docker_list_directory
 from server_manager.webservice.models import (
-    ContainerFileListResponse,
     NodeListResponse,
+    ServerFileListResponse,
     ServerListResponse,
     TemplateListResponse,
     UserListResponse,
@@ -32,7 +32,7 @@ def search_servers(current_user: Annotated[Users, Depends(auth_get_active_user)]
     return ServerListResponse(items={server.name: server.id for server in DB().get_server_list(current_user)})
 
 
-@router.get("/fs/{container_name}/{path:path}", response_model=ContainerFileListResponse)
+@router.get("/fs/{container_name}/{path:path}", response_model=ServerFileListResponse)
 async def search_fs(container_name: str, current_user: Annotated[Users, Depends(auth_get_active_user)], path: str = ""):  # noqa: ARG001
     """Search for files in a container's filesystem"""
 
@@ -42,7 +42,7 @@ async def search_fs(container_name: str, current_user: Annotated[Users, Depends(
     if ret is None:
         raise HTTPException(status_code=404, detail="Container not found or path invalid")
 
-    return ContainerFileListResponse(items=ret if ret else [])
+    return ServerFileListResponse(items=ret[0]+ [d+"/" for d in ret[1]])
 
 
 @router.get("/nodes/", response_model=NodeListResponse)

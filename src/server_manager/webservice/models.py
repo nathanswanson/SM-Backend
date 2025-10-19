@@ -66,8 +66,8 @@ class ContainerFileDeleteResponse(SuccessModel):
     pass
 
 
-class ContainerFileListResponse(StringListModel):
-    pass
+class ServerFileListResponse(BaseModel):
+    items: list[str]
 
 
 class ContainerFileUploadRequest(BaseModel):

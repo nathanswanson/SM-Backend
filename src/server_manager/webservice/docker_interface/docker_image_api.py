@@ -27,6 +27,7 @@ async def docker_get_image_exposed_volumes(image_name: str) -> list[str] | None:
         try:
             image = await client.images.get(image_name)
         except aiodocker.DockerError:
-            return None
+            await client.images.pull(image_name, tag="latest")
+            image = await client.images.get(image_name)
     exposed_volumes = image.get("Config", {}).get("Volumes")
     return list(exposed_volumes.keys() or [])

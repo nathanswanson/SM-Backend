@@ -53,6 +53,7 @@ async def get_server_info(server_id: int):
     server = DB().get_server(server_id)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
+
     return server
 
 
