@@ -10,6 +10,18 @@ class ServerUserLink(SQLModel, table=True):
     user_id: Optional[int] = Field(default=None, foreign_key="users.id", primary_key=True, description="User ID")
 
 
+class TemplateUserLink(SQLModel, table=True):
+    template_id: Optional[int] = Field(
+        default=None, foreign_key="templates.id", primary_key=True, description="Template ID"
+    )
+    user_id: Optional[int] = Field(default=None, foreign_key="users.id", primary_key=True, description="User ID")
+
+
+class NodeUserLink(SQLModel, table=True):
+    node_id: Optional[int] = Field(default=None, foreign_key="nodes.id", primary_key=True, description="Node ID")
+    user_id: Optional[int] = Field(default=None, foreign_key="users.id", primary_key=True, description="User ID")
+
+
 class TemplatesBase(SQLModel):
     name: str = Field(index=True, nullable=False, unique=True, description="Template name")
     image: str = Field(nullable=False, description="Docker image name")
@@ -17,15 +29,18 @@ class TemplatesBase(SQLModel):
         description="Comma-separated tags for the template",
         sa_column=Column(JSON),
     )
-    default_env: dict[str, str] | None = Field(
-        description="JSON string of default environment variables",
-        sa_column=Column(JSON),
+    exposed_port: list[int] = Field(
+        description="List of ports that are exposed by the template",
+        sa_column=Column(ARRAY(Integer)),
     )
-    user_env: dict[str, str] | None = Field(
+    exposed_volume: list[str] | None = Field(
+        default=None, description="List of volumes that are exposed by the template.", sa_column=Column(JSON)
+    )
+    modules: list[str] | None = Field(
         description='JSON string of "Modules" that will be added to server creator UI',
         sa_column=Column(JSON),
     )
-
+    description: str | None = Field(description="Template description", default=None)
     resource_min_cpu: int | None = Field(description="Minimum CPU resources required")
     resource_min_disk: int | None = Field(description="Minimum Disk resources required")
     resource_min_mem: int | None = Field(description="Minimum Memory resources required")
@@ -35,9 +50,7 @@ class Templates(TemplatesBase, table=True):
     # sql specific
     id: int | None = Field(primary_key=True, default=None, description="Template ID")
     linked_servers: list["Servers"] = Relationship(back_populates="server_template")
-    exposed_port: list[int] = Field(
-        description="List of ports exposed by the template", sa_column=Column(ARRAY(Integer))
-    )
+    linked_users: list["Users"] = Relationship(back_populates="linked_templates", link_model=TemplateUserLink)
 
 
 class TemplatesCreate(TemplatesBase):
@@ -58,7 +71,8 @@ class Users(UsersBase, table=True):
     # sql specific
     id: Optional[int] = Field(primary_key=True, nullable=False, unique=True, description="User ID")
     linked_servers: list["Servers"] = Relationship(back_populates="linked_users", link_model=ServerUserLink)
-
+    linked_templates: list["Templates"] = Relationship(back_populates="linked_users", link_model=TemplateUserLink)
+    linked_nodes: list["Nodes"] = Relationship(back_populates="linked_users", link_model=NodeUserLink)
     # private fields
     hashed_password: str
 
@@ -86,6 +100,7 @@ class Nodes(NodesBase, table=True):
     # sql specific
     id: Optional[int] = Field(primary_key=True, nullable=False, unique=True, description="Node ID")
     child_servers: list["Servers"] = Relationship(back_populates="server_node")
+    linked_users: list["Users"] = Relationship(back_populates="linked_nodes", link_model=NodeUserLink)
 
 
 class NodesCreate(NodesBase):
@@ -108,6 +123,11 @@ class ServersBase(SQLModel):
     container_name: str = Field(description="Docker container name for the server", default="")
     node_id: int = Field(foreign_key="nodes.id")
     template_id: int = Field(foreign_key="templates.id")
+    tags: list[str] = Field(
+        description="Comma-separated tags for the server",
+        sa_column=Column(JSON),
+        default=[],
+    )
 
 
 class Servers(

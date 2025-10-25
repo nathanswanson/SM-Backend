@@ -9,6 +9,7 @@ Author: Nathan Swanson
 from fastapi import APIRouter, HTTPException
 
 from server_manager.webservice.db_models import TemplatesBase, TemplatesRead
+from server_manager.webservice.docker_interface.docker_image_api import docker_image_exposed_port
 from server_manager.webservice.models import (
     TemplateCreateResponse,
     TemplateDeleteResponse,
@@ -19,9 +20,10 @@ router = APIRouter()
 
 
 @router.post("/", response_model=TemplateCreateResponse)
-def add_template(template: TemplatesBase):
+async def add_template(template: TemplatesBase):
     """add a new template"""
-    ret = DB().create_template(template)
+    ports = await docker_image_exposed_port(template.image)
+    ret = DB().create_template(template, exposed_port=ports)
     return TemplateCreateResponse(success=ret is not None)
 
 
@@ -32,7 +34,6 @@ def get_template(template_id: int):
     if template:
         return template
     raise HTTPException(status_code=404, detail="Template not found")
-
 
 
 @router.delete("/{name}/delete", response_model=TemplateDeleteResponse)

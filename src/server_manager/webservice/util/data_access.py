@@ -10,10 +10,13 @@ import os
 from collections.abc import Sequence
 from typing import cast
 
+import sqlalchemy
 import sqlalchemy.exc
 import sqlmodel
 from fastapi import HTTPException
+from psycopg2.errors import UniqueViolation
 from pydantic import ValidationError
+from sqlalchemy.exc import InvalidRequestError
 from sqlmodel import Session, SQLModel, create_engine, func, select
 
 from server_manager.webservice.db_models import (
@@ -48,21 +51,24 @@ class DB(metaclass=SingletonMeta):
             return obj
 
     def unused_port(self, count: int = 1) -> list[int] | None:
-
         with Session(self._engine) as session:
             all_ports = select(
                 func.generate_series(int(os.environ["SM_PORT_START"]), int(os.environ["SM_PORT_END"])).label("port")
             ).subquery("all_ports")
 
-            used_ports = select(
-                func.unnest(Servers.port).label("port"),
-            ).subquery("used_ports")
+            # Build a scalar subquery of used ports to avoid a CompoundSelect in the final statement
+            used_ports_scalar = select(func.unnest(Servers.port)).scalar_subquery()
 
+            # Use a plain SELECT with a NOT IN subquery instead of EXCEPT to satisfy typing for Session.exec
             statement = (
-                select(all_ports.c.port).except_(select(used_ports.c.port)).order_by(all_ports.c.port).limit(count)
+                select(all_ports.c.port)
+                .where(~all_ports.c.port.in_(used_ports_scalar))
+                .order_by(all_ports.c.port)
+                .limit(count)
             )
-            results = session.exec(statement).all()
-            return [port_tuple[0] for port_tuple in results]
+
+            rows = session.exec(statement).all()
+            return list(rows)
 
         return None
 
@@ -78,6 +84,11 @@ class DB(metaclass=SingletonMeta):
     def get_server(self, server_id: int) -> Servers | None:
         with Session(self._engine) as session:
             statement = sqlmodel.select(Servers).where(Servers.id == server_id)
+            return session.exec(statement).first()
+
+    def get_server_by_name(self, name: str) -> Servers | None:
+        with Session(self._engine) as session:
+            statement = sqlmodel.select(Servers).where(Servers.name == name)
             return session.exec(statement).first()
 
     def get_server_list(self, owner: Users) -> Sequence[ServersRead]:
@@ -128,13 +139,23 @@ class DB(metaclass=SingletonMeta):
 
     # template
 
-    def create_template(self, template: TemplatesBase):
+    def create_template(
+        self,
+        template: TemplatesBase,
+        **kwargs,
+    ):
         with Session(self._engine) as session:
             try:
-                mapped_template = Templates.model_validate(template)
+                mapped_template = Templates.model_validate(template, update=kwargs)
                 session.add(mapped_template)
                 session.commit()
                 session.refresh(mapped_template)
+            except sqlalchemy.exc.IntegrityError as e:
+                if isinstance(e.orig, UniqueViolation):
+                    raise HTTPException(
+                        status_code=422, detail={"error": "TemplateExists", "message": "Template already exists"}
+                    ) from e
+                raise HTTPException(status_code=500, detail="failed to create template") from e
             except ValidationError as e:
                 raise HTTPException(status_code=500, detail=f"failed to validate Template error: {e}") from e
             return mapped_template
@@ -154,7 +175,7 @@ class DB(metaclass=SingletonMeta):
                 try:
                     session.delete(template_obj)
                     session.commit()
-                except sqlalchemy.exc.InvalidRequestError:
+                except InvalidRequestError:
                     return False
                 else:
                     return True

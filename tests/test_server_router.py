@@ -126,11 +126,10 @@ def test_create_server(mock_db, mock_docker):
         image="test-image",
         exposed_port=[8080],
         tags=[],
-        default_env={},
-        user_env={},
         resource_min_cpu=0,
         resource_min_disk=0,
         resource_min_mem=0,
+        modules=[],
     )
     mock_db.create_server.return_value = Servers(id=3, container_name="c_new-server", port=[], env={}, **server_data)
     mock_docker["create"].return_value = True

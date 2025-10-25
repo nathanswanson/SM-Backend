@@ -246,7 +246,8 @@ async def docker_container_inspect(container_name: str) -> HealthInfo | None:
         if container:
             info = await container.show()
             health_logs = info["State"].get("Health")
-            if len(health_logs) == 0:
+            print(info["State"])
+            if not health_logs or not len(health_logs):
                 return None
             health_data = info["State"]["Health"]["Log"][-1]
             return HealthInfo.model_validate(health_data)
@@ -274,7 +275,7 @@ async def docker_container_metrics(container_name: str) -> AsyncGenerator[str]:
                         )
                     )
                 except KeyError:
-                    yield str([0, 0, 0, 0, 0, 0])
+                    yield str([-1, -1, -1, -1, -1, -1])
                 await asyncio.sleep(5)
 
 
@@ -332,7 +333,7 @@ async def docker_container_logs_tail(container_name: str, tail: int) -> list[str
         container: DockerContainer = await client.containers.get(container_name)
     except aiodocker.DockerError as e:
         sm_logger.error("Failed to Find docker container %s", container_name)
-        raise HTTPException(status_code=404, detail=f"Failed to find container '{container_name }'") from e
+        raise HTTPException(status_code=404, detail=f"Failed to find container '{container_name}'") from e
     logs = await container.log(tail=tail, stdout=True, stderr=True)
     lines: list[str] = []
     for chunk in logs:

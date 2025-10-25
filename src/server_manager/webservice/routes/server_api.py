@@ -33,11 +33,11 @@ async def create_server(server: ServersBase, current_user: Annotated[Users, Depe
     template = DB().get_template(server.template_id)
     server.container_name = server.name
     # make sure server doesn't already exist
-
+    existing_server = DB().get_server_by_name(server.name)
+    if existing_server:
+        raise HTTPException(status_code=400, detail="Server with that name already exists")
     if template:
-        docker_ret = await docker_container_create(
-            server.name, template.image, template.default_env or {} | server.env, server_link=server.name
-        )
+        docker_ret = await docker_container_create(server.name, template.image, server.env, server_link=server.name)
         if not docker_ret:
             raise HTTPException(status_code=500, detail="Failed to create Docker container")
         return DB().create_server(
@@ -94,7 +94,7 @@ async def stop_server(server_id: int):
     return {"success": ret}
 
 
-@router.get("/{server_id}/status", response_model=ServerStatusResponse)
+@router.get("/{server_id}/status", response_model=ServerStatusResponse | None)
 async def get_server_status(server_id: int):
     """Get the running status of a specific server"""
     server = DB().get_server(server_id)

@@ -34,6 +34,7 @@ path = "src/server_manager/__about__.py"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/server_manager"]
+include = ["src/*.py", "src/resources/*"]
 
 [tool.hatch.envs.hatch-static-analysis]
 dependencies = ["ruff>=0.12.8"]
