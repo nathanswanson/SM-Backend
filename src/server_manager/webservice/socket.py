@@ -47,10 +47,14 @@ def socketio_app(origins: list[str]) -> socketio.AsyncServer:
             await sio_app.leave_room(sid, room)
 
     async def process_all_rooms_task():
-        while True:
-            async for message in await merge_streams():
-                await sio_app.emit(event=message.event_type, room=message.room, data=message.data, namespace="/")
-                await asyncio.sleep(0)
+        """
+        This task should be a long-running async generator that yields messages
+        as they become available from the underlying streams (logs, metrics).
+        """
+        streams = await merge_streams()
+        async for message in streams:
+            await sio_app.emit(event=message.event_type, room=message.room, data=message.data, namespace="/")
+            # Yield control to the event loop to prevent blocking
             await asyncio.sleep(0)
 
     sio_app.start_background_task(process_all_rooms_task)

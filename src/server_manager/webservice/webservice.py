@@ -17,19 +17,18 @@ from fastapi.routing import APIRoute
 from fastapi.staticfiles import StaticFiles
 
 from server_manager.webservice.logger import sm_logger
-from server_manager.webservice.routes import managment_api, nodes_api, search_api, server_api, template_api
-from server_manager.webservice.routes.containers import api, volumes_api
+from server_manager.webservice.routes import managment_api, nodes_api, search_api, server_api, template_api, volumes_api
 from server_manager.webservice.socket import socketio_app
 from server_manager.webservice.util.auth import auth_get_active_user
 from server_manager.webservice.util.dev import dev_startup
 from server_manager.webservice.util.env_check import startup_info
 
 # main app
-fastapi_app = FastAPI()
+fastapi_app = FastAPI(debug=True)
 # CORS middleware
 cors_allowed_origins = [
     "https://admin.socket.io",
-    f"{'https' if os.environ.get('SM_ENV') != 'DEV' else 'http'}://{os.environ.get('SM_API_BACKEND')}",
+    f"{'https' if os.environ.get('SM_ENV') != 'DEV' else 'https'}://{os.environ.get('SM_API_BACKEND')}",
 ]
 fastapi_app.add_middleware(
     CORSMiddleware,
@@ -41,13 +40,12 @@ fastapi_app.add_middleware(
 sm_logger.debug("CORS allowed origins: %s", cors_allowed_origins)
 # routers
 oauth2_wrapper: dict = {"dependencies": [Depends(auth_get_active_user)]}
-api.router.include_router(volumes_api.router)
-fastapi_app.include_router(api.router, **oauth2_wrapper, prefix="/containers", tags=["containers"])
 fastapi_app.include_router(template_api.router, **oauth2_wrapper, prefix="/templates", tags=["templates"])
 fastapi_app.include_router(managment_api.router, prefix="/users", tags=["users"])
 fastapi_app.include_router(server_api.router, **oauth2_wrapper, prefix="/servers", tags=["servers"])
 fastapi_app.include_router(nodes_api.router, **oauth2_wrapper, prefix="/nodes", tags=["nodes"])
 fastapi_app.include_router(search_api.router, **oauth2_wrapper, prefix="/search", tags=["search"])
+fastapi_app.include_router(volumes_api.router, **oauth2_wrapper, prefix="/volumes", tags=["volumes"])
 # frontend
 
 

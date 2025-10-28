@@ -246,7 +246,6 @@ async def docker_container_inspect(container_name: str) -> HealthInfo | None:
         if container:
             info = await container.show()
             health_logs = info["State"].get("Health")
-            print(info["State"])
             if not health_logs or not len(health_logs):
                 return None
             health_data = info["State"]["Health"]["Log"][-1]

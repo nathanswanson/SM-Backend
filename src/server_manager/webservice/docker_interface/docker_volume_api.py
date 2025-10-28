@@ -7,12 +7,14 @@ Author: Nathan Swanson
 """
 
 import os
+import tarfile
 from collections.abc import AsyncGenerator
 from typing import TYPE_CHECKING
 
 from aiodocker import DockerError
 
 from server_manager.webservice.docker_interface.docker_container_api import docker_container
+from server_manager.webservice.logger import logging
 
 if TYPE_CHECKING:
     from io import BytesIO
@@ -22,14 +24,22 @@ async def docker_list_directory(container_name: str, path: str) -> tuple[list[st
     """list files in a directory inside a container"""
     async with docker_container(container_name) as container:
         if container:
-            exec_log_files = await container.exec(["find", path, '-maxdepth','1','-type', 'f', '-printf', '%P\n'], workdir="/")
-            exec_log_dirs = await container.exec(["find", path, '-maxdepth','1','-type', 'd', '-printf', '%P\n'], workdir="/")
+            exec_log_files = await container.exec(
+                ["find", path, "-maxdepth", "1", "-type", "f", "-printf", "%P\n"], workdir="/"
+            )
+            exec_log_dirs = await container.exec(
+                ["find", path, "-maxdepth", "1", "-type", "d", "-printf", "%P\n"], workdir="/"
+            )
+            # filter out for volume mounts only
+            files: list[str] = []
+            dirs: list[str] = []
             response_files = await exec_log_files.start().read_out()
             response_dirs = await exec_log_dirs.start().read_out()
-            if response_files and response_dirs:
+            if response_files:
                 files = response_files.data.decode("utf-8").split()
+            if response_dirs:
                 dirs = response_dirs.data.decode("utf-8").split()
-                return files, dirs
+            return files, dirs
     return None
 
 
@@ -49,16 +59,22 @@ async def docker_read_file(container_name: str, path: str) -> AsyncGenerator:
             yield -1
 
 
+async def docker_read_tarfile(container_name: str, path: str) -> tarfile.TarFile:
+    """read a tarfile from a container"""
+    async with docker_container(container_name) as container:
+        return await container.get_archive(path)
+
+
 async def docker_file_upload(container_name: str, path: str, data: bytes) -> bool:
     """upload a file to a container"""
     async with docker_container(container_name) as container:
         if container:
-            print(container)
             try:
                 # get dirname
                 await container.put_archive(os.path.dirname(path), data)
             except DockerError as e:
-                print("Failed to upload file:", e)
+                logging.error(f"Error uploading file to container {container_name}: {e}")
+                return False
             return True
         return False
 
