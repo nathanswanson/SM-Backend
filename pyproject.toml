@@ -24,6 +24,7 @@ dependencies = [
     "python-socketio",
     "colorama",
     "requests",
+    "strawberry-graphql[fastapi]",
 ]
 
 [project.scripts]
@@ -50,10 +51,10 @@ dependencies = [
     "pytest-asyncio",
     "websocket-client",
 ]
+include = ["src/*.py", "src/resources/*"]
 
 [tool.hatch.envs.default.scripts]
 debug = "python -Xfrozen_modules=off -m debugpy --listen 0.0.0.0:5678  -m uvicorn src.server_manager.webservice.webservice:app --reload --host 0.0.0.0 --port 8000"
-
 
 # test
 [tool.hatch.envs.hatch-test]
