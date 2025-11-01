@@ -1,6 +1,5 @@
 import logging
 import logging.config
-import os
 
 from server_manager.webservice.util.singleton import SingletonMeta
 
@@ -15,7 +14,7 @@ LOG_CONFIG = {
     },
     "handlers": {
         "default": {
-            "level": "INFO",
+            "level": "DEBUG",
             "formatter": "standard",
             "class": "rich.logging.RichHandler",
             "rich_tracebacks": True,
@@ -26,7 +25,7 @@ LOG_CONFIG = {
             "log_time_format": "[%X]",
         },
         "fallback": {
-            "level": "INFO",
+            "level": "DEBUG",
             "formatter": "standard",
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stdout",
@@ -35,10 +34,10 @@ LOG_CONFIG = {
     "loggers": {
         "": {  # root logger
             "handlers": ["default"],
-            "level": "WARNING",
+            "level": "DEBUG",
             "propagate": False,
         },
-        "server-manager": {"handlers": ["default"], "level": "INFO", "propagate": False},
+        "server-manager": {"handlers": ["default"], "level": "DEBUG", "propagate": False},
         "__main__": {  # if __name__ == '__main__'
             "handlers": ["default"],
             "level": "DEBUG",
@@ -55,9 +54,9 @@ class SMLogger(metaclass=SingletonMeta):
     def __init__(self):
         root_logger = logging.getLogger()
         logging.config.dictConfig(LOG_CONFIG)
-        root_logger.setLevel(os.environ.get("SM_LOG_LEVEL", "INFO"))
+        root_logger.setLevel("DEBUG")
         self.logger = logging.getLogger("server-manager")
-        self.logger.setLevel(os.environ.get("SM_LOG_LEVEL", "INFO"))
+        self.logger.setLevel("DEBUG")
 
     def debug(self, msg: str, *args, **kwargs):
         message = f"\x1b[90m\x1b[3m{msg}\x1b[0m"

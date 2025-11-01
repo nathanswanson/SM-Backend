@@ -8,62 +8,26 @@ Author: Nathan Swanson
 
 from __future__ import annotations
 
-import asyncio
 import os
-from contextlib import asynccontextmanager
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import aiodocker
 from fastapi import HTTPException
 
 from server_manager.webservice.docker_interface.docker_image_api import docker_get_image_exposed_volumes
+from server_manager.webservice.util.context_provider import docker_client, docker_container
 
 if TYPE_CHECKING:
-    from collections.abc import AsyncGenerator
-
     from aiodocker.containers import DockerContainer
+
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from server_manager.webservice.logger import sm_logger
 
+SSE_KEEP_ALIVE_INTERVAL = 5  # seconds
+
 banned_container_access = ["server-manager", "rproxy", "docker-socket-proxy", "postgres", "postgres_admin"]
-
-
-@dataclass
-class Message:
-    room: str
-    data: str
-    event_type: str = "push_log"
-
-
-@dataclass
-class Provider:
-    task_log: asyncio.Task
-    task_metric: asyncio.Task
-
-    def cancel_all(self):
-        self.task_log.cancel()
-        self.task_metric.cancel()
-
-
-@asynccontextmanager
-async def docker_client():
-    client = aiodocker.Docker()
-    try:
-        yield client
-    finally:
-        await client.close()
-
-
-@asynccontextmanager
-async def docker_container(container: str):
-    async with docker_client() as client:
-        try:
-            yield client.containers.container(container)
-        except aiodocker.exceptions.DockerError:
-            return
 
 
 async def docker_container_name_exists(name: str) -> bool:
@@ -253,31 +217,6 @@ async def docker_container_inspect(container_name: str) -> HealthInfo | None:
     return None
 
 
-async def docker_container_metrics(container_name: str) -> AsyncGenerator[str]:
-    """stream metrics from a container"""
-    if container_name in banned_container_access:
-        raise HTTPException(status_code=403, detail="Access to container denied")
-    async with docker_container(container_name) as container:
-        if container:
-            async for stat in container.stats():
-                try:
-                    yield (
-                        str(
-                            [
-                                round(_cpu_percent(stat), 4),
-                                round(stat["memory_stats"]["usage"] / stat["memory_stats"]["limit"], 4),
-                                stat["networks"]["eth0"]["rx_bytes"],
-                                stat["networks"]["eth0"]["tx_bytes"],
-                                stat["blkio_stats"]["io_service_bytes_recursive"][0]["value"],
-                                stat["blkio_stats"]["io_service_bytes_recursive"][1]["value"],
-                            ]
-                        )
-                    )
-                except KeyError:
-                    yield str([-1, -1, -1, -1, -1, -1])
-                await asyncio.sleep(5)
-
-
 async def docker_container_send_command(name: str, command: str):
     """send a command to a container"""
     async with docker_container(name) as container:
@@ -292,110 +231,3 @@ async def docker_container_send_command(name: str, command: str):
             await sock.write_in(f"{command}\n".encode())
             return True
         return False
-
-
-def _cpu_percent(metric: dict[str, Any]) -> float:
-    """calculate cpu percentage from a metric"""
-    try:
-        cpu_stats = metric.get("cpu_stats", {})
-        precpu_stats = metric.get("precpu_stats", {})
-
-        total_usage_current = cpu_stats.get("cpu_usage", {}).get("total_usage", 0)
-        total_usage_prev = precpu_stats.get("cpu_usage", {}).get("total_usage", 0)
-
-        total_system_current = cpu_stats.get("system_cpu_usage", 0)
-        total_system_prev = precpu_stats.get("system_cpu_usage", 0)
-
-        cpu_delta = total_usage_current - total_usage_prev
-        system_delta = total_system_current - total_system_prev
-
-        if system_delta <= 0 or cpu_delta <= 0:
-            return 0.0
-
-        # Prefer reported online_cpus, fall back to percpu_usage length, then to 1
-        online_cpus = cpu_stats.get("online_cpus")
-        if not online_cpus:
-            percpu = cpu_stats.get("cpu_usage", {}).get("percpu_usage") or []
-            online_cpus = len(percpu) or 1
-
-        return (cpu_delta / system_delta) * float(online_cpus) * 100.0
-    except KeyError:
-        return 0.0
-
-
-async def docker_container_logs_tail(container_name: str, tail: int) -> list[str]:
-    """get the last n lines of logs from a container"""
-    if container_name in banned_container_access:
-        raise HTTPException(status_code=403, detail="Access to container denied")
-    client = aiodocker.Docker()
-    try:
-        container: DockerContainer = await client.containers.get(container_name)
-    except aiodocker.DockerError as e:
-        sm_logger.error("Failed to Find docker container %s", container_name)
-        raise HTTPException(status_code=404, detail=f"Failed to find container '{container_name}'") from e
-    logs = await container.log(tail=tail, stdout=True, stderr=True)
-    lines: list[str] = []
-    for chunk in logs:
-        lines.extend(chunk.splitlines())
-    await client.close()
-    return lines
-
-
-async def docker_container_logs(container_name: str) -> Any:
-    """stream logs from a container"""
-    async with docker_container(container_name) as container:
-        if container:
-            log_buffer = ""
-            # TODO: timeout error fix
-            async for chunk in container.log(stdout=True, stderr=True, follow=True):
-                log_buffer += chunk
-                while "\n" in log_buffer:
-                    line, log_buffer = log_buffer.split("\n", 1)
-                    yield line + "\n"
-
-
-async def merge_streams() -> AsyncGenerator[Message, None]:
-    """merge logs and metrics from all containers"""
-    queue = asyncio.Queue(maxsize=100)
-
-    async def __monitor_all_containers():
-        tasks: dict[str, Provider] = {}
-
-        async with docker_client() as client:
-            while True:
-                running_containers = {_extract_common_name(c): c for c in await client.containers.list()}
-
-                # Start monitoring for new containers
-                for name in set(running_containers.keys()) - set(tasks.keys()):
-                    if name in banned_container_access:
-                        continue
-
-                    async def enqueue_stream(stream, container_name, command: str):
-                        try:
-                            async for msg in stream(container_name):
-                                await queue.put(Message(data=msg, room=f"01+{container_name}", event_type=command))
-                        except asyncio.CancelledError:
-                            sm_logger.debug("Stream for %s cancelled", container_name)
-                            if container_name in tasks:
-                                tasks.pop(container_name).cancel_all()
-
-                    provider = Provider(
-                        asyncio.create_task(enqueue_stream(docker_container_metrics, name, "push_metric")),
-                        asyncio.create_task(enqueue_stream(docker_container_logs, name, "push_log")),
-                    )
-                    tasks[name] = provider
-
-                # Stop monitoring for containers that are no longer running
-                for name in set(tasks.keys()) - set(running_containers.keys()):
-                    if name in tasks:
-                        tasks.pop(name).cancel_all()
-
-                await asyncio.sleep(5)
-
-    _ref = [asyncio.create_task(__monitor_all_containers())]
-
-    async def consumer_generator():
-        while True:
-            yield await queue.get()
-
-    return consumer_generator()

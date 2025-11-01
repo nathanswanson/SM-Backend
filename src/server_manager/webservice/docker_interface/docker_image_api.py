@@ -9,16 +9,8 @@ Author: Nathan Swanson
 from __future__ import annotations
 
 import aiodocker
-from fastapi.concurrency import asynccontextmanager
 
-
-@asynccontextmanager
-async def docker_client():
-    client = aiodocker.Docker()
-    try:
-        yield client
-    finally:
-        await client.close()
+from server_manager.webservice.util.context_provider import docker_client
 
 
 async def docker_image_exposed_port(image_name: str) -> list[int] | None:

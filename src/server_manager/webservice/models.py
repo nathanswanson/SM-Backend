@@ -142,3 +142,13 @@ class NodeListResponse(StringToIDMapModel):
 
 class AuthPingResponse(BaseModel):
     recieved_at: int
+
+
+## graphql
+
+
+class Metrics(BaseModel):
+    cpu: float
+    memory: float
+    disk: float
+    network: float

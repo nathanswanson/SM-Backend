@@ -185,10 +185,11 @@ class DB(metaclass=SingletonMeta):
 
     def create_node(self, node: NodesBase) -> NodesRead:
         with Session(self._engine) as session:
-            session.add(node)
+            mapped_node = Nodes.model_validate(node)
+            session.add(mapped_node)
             session.commit()
-            session.refresh(node)
-            return cast(NodesRead, node)
+            session.refresh(mapped_node)
+            return cast(NodesRead, mapped_node)
 
     def get_node(self, node_id: int) -> NodesRead | None:
         with Session(self._engine) as session:

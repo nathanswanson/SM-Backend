@@ -98,7 +98,7 @@ class NodesBase(SQLModel):
 
 class Nodes(NodesBase, table=True):
     # sql specific
-    id: Optional[int] = Field(primary_key=True, nullable=False, unique=True, description="Node ID")
+    id: Optional[int] = Field(primary_key=True, nullable=False, default=None, unique=True, description="Node ID")
     child_servers: list["Servers"] = Relationship(back_populates="server_node")
     linked_users: list["Users"] = Relationship(back_populates="linked_nodes", link_model=NodeUserLink)
 
