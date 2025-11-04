@@ -168,6 +168,23 @@ class DB(metaclass=SingletonMeta):
         with Session(self._engine) as session:
             return cast(Sequence[TemplatesRead], session.exec(sqlmodel.select(Templates)).all())
 
+    def update_template(self, template_id: int, template: TemplatesBase, **kwargs) -> Templates | None:
+        with Session(self._engine) as session:
+            template_obj = session.get(Templates, template_id)
+            if template_obj is not None:
+                try:
+                    updated_template = template.model_copy(update=kwargs)
+                    for key, value in updated_template.model_dump().items():
+                        setattr(template_obj, key, value)
+                    session.add(template_obj)
+                    session.commit()
+                    session.refresh(template_obj)
+                except (sqlalchemy.exc.IntegrityError, ValidationError):
+                    return None
+                else:
+                    return template_obj
+        return None
+
     def delete_template(self, template_id: int) -> bool:
         with Session(self._engine) as session:
             template_obj = session.get(Templates, template_id)

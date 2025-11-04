@@ -36,6 +36,14 @@ def get_template(template_id: int):
     raise HTTPException(status_code=404, detail="Template not found")
 
 
+@router.patch("/{template_id}", response_model=TemplateCreateResponse)
+async def update_template(template_id: int, template: TemplatesBase):
+    """update a template by id"""
+    ports = await docker_image_exposed_port(template.image)
+    ret = DB().update_template(template_id, template, exposed_port=ports)
+    return TemplateCreateResponse(success=ret is not None)
+
+
 @router.delete("/{name}/delete", response_model=TemplateDeleteResponse)
 def delete_template(template_id: int):
     """delete a template by name"""
