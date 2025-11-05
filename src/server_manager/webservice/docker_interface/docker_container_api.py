@@ -9,6 +9,7 @@ Author: Nathan Swanson
 from __future__ import annotations
 
 import os
+import subprocess
 from typing import TYPE_CHECKING
 
 import aiodocker
@@ -138,6 +139,16 @@ async def map_image_volumes(image_name: str, container_name: str) -> list[str]:
     return []
 
 
+def _get_servers_network_name() -> str:
+    """get the servers network name"""
+    return subprocess.run(
+        ["/usr/bin/docker", "network", "ls", "--filter", "name=_servers$", "--format", "{{.Name}}"],
+        check=False,
+        capture_output=True,
+        text=True,
+    ).stdout.strip()
+
+
 async def docker_container_create(
     container_name: str,
     image_name: str,
@@ -146,7 +157,6 @@ async def docker_container_create(
     user_link: str | None = None,
 ) -> bool:
     """create a new container from an image"""
-    cwd_parent_dirname = os.path.abspath(os.curdir).split("/")[-1]
 
     async with docker_client() as client:
         try:
@@ -154,7 +164,7 @@ async def docker_container_create(
                 "Image": image_name,
                 "Tty": True,
                 "OpenStdin": True,
-                "NetworkingConfig": {"EndpointsConfig": {f"{cwd_parent_dirname}_servers": {}}},
+                "NetworkingConfig": {"EndpointsConfig": {_get_servers_network_name(): {}}},
                 "HostConfig": {"Binds": await map_image_volumes(image_name, container_name)},
             }
 
