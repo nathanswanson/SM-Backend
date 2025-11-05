@@ -17,7 +17,14 @@ from fastapi.staticfiles import StaticFiles
 
 from server_manager.webservice import graphql
 from server_manager.webservice.logger import sm_logger
-from server_manager.webservice.routes import managment_api, nodes_api, search_api, server_api, template_api, volumes_api
+from server_manager.webservice.routes import (
+    managment_api,
+    nodes_api,
+    search_api,
+    server_api,
+    template_api,
+    volumes_api,
+)
 from server_manager.webservice.util.auth import auth_get_active_user
 from server_manager.webservice.util.dev import dev_startup
 from server_manager.webservice.util.env_check import startup_info
