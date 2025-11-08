@@ -9,7 +9,7 @@ Author: Nathan Swanson
 import os
 from pathlib import Path
 
-from fastapi import Depends, FastAPI
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.routing import APIRoute
@@ -25,7 +25,7 @@ from server_manager.webservice.routes import (
     template_api,
     volumes_api,
 )
-from server_manager.webservice.util.auth import auth_get_active_user
+from server_manager.webservice.routes.managment_api import oauth2_wrapper
 from server_manager.webservice.util.dev import dev_startup
 from server_manager.webservice.util.env_check import startup_info
 from server_manager.webservice.util.recovery import recovery
@@ -48,7 +48,6 @@ app.add_middleware(
 )
 sm_logger.debug("CORS allowed origins: %s", cors_allowed_origins)
 # routers
-oauth2_wrapper: dict = {"dependencies": [Depends(auth_get_active_user)]}
 app.include_router(template_api.router, **oauth2_wrapper, prefix="/templates", tags=["templates"])
 app.include_router(managment_api.router, prefix="/users", tags=["users"])
 app.include_router(server_api.router, **oauth2_wrapper, prefix="/servers", tags=["servers"])

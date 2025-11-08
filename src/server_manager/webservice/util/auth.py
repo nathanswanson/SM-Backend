@@ -23,7 +23,7 @@ from server_manager.webservice.util.data_access import DB
 load_dotenv()
 
 _ALGORITHM = "HS256"
-_ACCESS_TOKEN_EXPIRE_MINUTES = 30
+_ACCESS_TOKEN_EXPIRE_MINUTES = 60
 _SECRET_KEY = os.environ["SM_SECRET_KEY"]
 
 _salt = bcrypt.gensalt()
@@ -61,7 +61,11 @@ def create_user(username: str, password: str):
 def create_access_token(data: dict, expired_delta: timedelta | None = None):
     """create a JWT access token"""
     to_encode = data.copy()
-    expire = datetime.now(UTC) + expired_delta if expired_delta else datetime.now(UTC) + timedelta(minutes=60)
+    expire = (
+        datetime.now(UTC) + expired_delta
+        if expired_delta
+        else datetime.now(UTC) + timedelta(minutes=_ACCESS_TOKEN_EXPIRE_MINUTES)
+    )
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, _SECRET_KEY, algorithm=_ALGORITHM)
 
@@ -122,4 +126,4 @@ async def auth_aquire_access_token(form_data: Annotated[OAuth2PasswordRequestFor
         )
     access_token_expire = timedelta(minutes=_ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(data={"sub": user.username}, expired_delta=access_token_expire)
-    return Token(access_token=access_token, token_type="bearer", expire_time=access_token_expire.seconds)  # noqa: S106
+    return Token(access_token=access_token, token_type="bearer", expire_time=access_token_expire.seconds)  # noqa: S106, not a password
