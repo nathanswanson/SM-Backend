@@ -9,7 +9,7 @@ Author: Nathan Swanson
 import os
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 
@@ -36,15 +36,15 @@ async def login_user(form_data: Annotated[OAuth2PasswordRequestForm, Depends()])
     return await auth_aquire_access_token(form_data)
 
 
-@router.post("/revoke", dependencies=[Depends(auth_get_active_user)])
-async def logout_user(response: Response, _current_user: Annotated[Users, Depends(auth_get_active_user)]):
+@router.post("/revoke", dependencies=[Depends(oauth2_scheme)])
+async def logout_user(_current_user: Annotated[Users, Depends(auth_get_active_user)]):
     """logout user, delete access token cookie"""
-    response.delete_cookie(key="token", httponly=True, secure=not dev_mode, samesite="lax" if dev_mode else "strict")
     # return response with message
-    return JSONResponse(headers=response.headers, content={"message": "Logout successful"})
+    # TODO: implement token revocation
+    return JSONResponse(content={"message": "Logout successful"})
 
 
-@router.get("/me", response_model=UsersBase)
+@router.get("/me", response_model=UsersBase, dependencies=[Depends(oauth2_scheme)])
 async def get_user(current_user: Annotated[Users, Depends(auth_get_active_user)]):
     """get current user information"""
     return current_user
