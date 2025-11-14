@@ -8,7 +8,7 @@ Author: Nathan Swanson
 
 from fastapi import APIRouter, HTTPException
 
-from server_manager.webservice.db_models import TemplatesBase, TemplatesRead
+from server_manager.webservice.db_models import TemplatesCreate, TemplatesRead
 from server_manager.webservice.docker_interface.docker_image_api import docker_image_exposed_port
 from server_manager.webservice.models import (
     TemplateCreateResponse,
@@ -20,7 +20,7 @@ router = APIRouter()
 
 
 @router.post("/", response_model=TemplateCreateResponse)
-async def add_template(template: TemplatesBase):
+async def add_template(template: TemplatesCreate):
     """add a new template"""
     ports = await docker_image_exposed_port(template.image)
     ret = DB().create_template(template, exposed_port=ports)
@@ -37,7 +37,7 @@ def get_template(template_id: int):
 
 
 @router.patch("/{template_id}", response_model=TemplateCreateResponse)
-async def update_template(template_id: int, template: TemplatesBase):
+async def update_template(template_id: int, template: TemplatesCreate):
     """update a template by id"""
     ports = await docker_image_exposed_port(template.image)
     ret = DB().update_template(template_id, template, exposed_port=ports)

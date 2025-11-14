@@ -27,7 +27,7 @@ from server_manager.webservice.db_models import (
     ServersCreate,
     ServersRead,
     Templates,
-    TemplatesBase,
+    TemplatesCreate,
     TemplatesRead,
     Users,
     UsersCreate,
@@ -107,8 +107,8 @@ class DB(metaclass=SingletonMeta):
             user_obj = session.get(Users, user_id)
             if user_obj is None:
                 raise HTTPException(status_code=404, detail="User not found")
-
-            server_obj.linked_users.append(user_obj)
+            server_orm = ServersRead.model_validate(server_obj)
+            server_orm.linked_users.append(user_obj)
             session.add(server_obj)
             session.commit()
 
@@ -158,7 +158,7 @@ class DB(metaclass=SingletonMeta):
 
     def create_template(
         self,
-        template: TemplatesBase,
+        template: TemplatesCreate,
         **kwargs,
     ):
         with Session(self._engine) as session:
@@ -185,7 +185,7 @@ class DB(metaclass=SingletonMeta):
         with Session(self._engine) as session:
             return cast(Sequence[TemplatesRead], session.exec(sqlmodel.select(Templates)).all())
 
-    def update_template(self, template_id: int, template: TemplatesBase, **kwargs) -> Templates | None:
+    def update_template(self, template_id: int, template: TemplatesCreate, **kwargs) -> Templates | None:
         with Session(self._engine) as session:
             template_obj = session.get(Templates, template_id)
             if template_obj is not None:

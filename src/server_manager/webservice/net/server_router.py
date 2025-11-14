@@ -6,7 +6,7 @@ from http import HTTPStatus
 
 import requests
 
-from server_manager.webservice.db_models import Servers, ServersRead
+from server_manager.webservice.db_models import ServersRead
 from server_manager.webservice.docker_interface.docker_container_api import docker_container_name_exists
 from server_manager.webservice.logger import sm_logger
 from server_manager.webservice.util.data_access import DB
@@ -77,7 +77,7 @@ class ServerRouter(metaclass=SingletonMeta):
             return response.status_code == HTTPStatus.OK
         return False
 
-    def close_ports(self, server: Servers) -> bool:
+    def close_ports(self, server: ServersRead) -> bool:
         try:
             response = requests.delete(_container_exists_config_url(server.container_name), timeout=5)
         except requests.RequestException:

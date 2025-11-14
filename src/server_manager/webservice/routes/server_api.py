@@ -2,7 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, HTTPException
 
-from server_manager.webservice.db_models import ServersBase, ServersRead, Users
+from server_manager.webservice.db_models import ServersCreate, ServersRead, Users
 from server_manager.webservice.docker_interface.docker_container_api import (
     docker_container_create,
     docker_container_health_status,
@@ -28,7 +28,7 @@ router = APIRouter()
 
 
 @router.post("/", response_model=ServersRead)
-async def create_server(server: ServersBase, current_user: Annotated[Users, Depends(auth_get_active_user)]):
+async def create_server(server: ServersCreate, current_user: Annotated[Users, Depends(auth_get_active_user)]):
     """Create a new server"""
     # create container of Servers.name name
     # start with template then override with server data if present
