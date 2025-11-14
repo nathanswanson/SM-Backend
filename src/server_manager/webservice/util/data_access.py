@@ -107,8 +107,7 @@ class DB(metaclass=SingletonMeta):
             user_obj = session.get(Users, user_id)
             if user_obj is None:
                 raise HTTPException(status_code=404, detail="User not found")
-            server_orm = ServersRead.model_validate(server_obj)
-            server_orm.linked_users.append(user_obj)
+            server_obj.linked_users.append(user_obj)
             session.add(server_obj)
             session.commit()
 
