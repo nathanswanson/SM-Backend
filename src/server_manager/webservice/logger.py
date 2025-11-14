@@ -1,20 +1,24 @@
 import logging
 import logging.config
+import os
 
 from server_manager.webservice.util.singleton import SingletonMeta
 
 LOG_CONFIG = {
     "version": 1,
-    "disable_existing_loggers": False,
+    "disable_existing_loggers": True,
     "formatters": {
         "standard": {
             "format": "%(message)s",
             "datefmt": "[%X]",
         },
+        "sqlalchemy": {
+            "format": "\x1b[3m%(message)s\x1b[0m test",
+        },
     },
     "handlers": {
         "default": {
-            "level": "DEBUG",
+            "level": "NOTSET",
             "formatter": "standard",
             "class": "rich.logging.RichHandler",
             "rich_tracebacks": True,
@@ -24,8 +28,19 @@ LOG_CONFIG = {
             "show_path": False,
             "log_time_format": "[%X]",
         },
+        "sqlalchemy": {
+            "level": "NOTSET",
+            "formatter": "sqlalchemy",
+            "class": "rich.logging.RichHandler",
+            "rich_tracebacks": True,
+            "markup": False,
+            "show_time": True,
+            "show_level": True,
+            "show_path": False,
+            "log_time_format": "[%X]",
+        },
         "fallback": {
-            "level": "DEBUG",
+            "level": "NOTSET",
             "formatter": "standard",
             "class": "logging.StreamHandler",
             "stream": "ext://sys.stdout",
@@ -34,18 +49,19 @@ LOG_CONFIG = {
     "loggers": {
         "": {  # root logger
             "handlers": ["default"],
-            "level": "DEBUG",
+            "level": "NOTSET",
             "propagate": False,
         },
-        "server-manager": {"handlers": ["default"], "level": "DEBUG", "propagate": False},
+        "server-manager": {"handlers": ["default"], "level": "NOTSET", "propagate": False},
         "__main__": {  # if __name__ == '__main__'
             "handlers": ["default"],
-            "level": "DEBUG",
+            "level": "NOTSET",
             "propagate": False,
         },
-        "uvicorn.asgi": {"handlers": ["default"], "level": "INFO", "propagate": False},
-        "uvicorn.error": {"handlers": ["default"], "level": "INFO", "propagate": False},
-        "uvicorn.access": {"handlers": ["default"], "level": "INFO", "propagate": False},
+        "sqlalchemy.engine": {"handlers": ["sqlalchemy"], "level": "NOTSET", "propagate": False},
+        "uvicorn.asgi": {"handlers": ["default"], "level": "NOTSET", "propagate": False},
+        "uvicorn.error": {"handlers": ["default"], "level": "NOTSET", "propagate": False},
+        "uvicorn.access": {"handlers": ["default"], "level": "NOTSET", "propagate": False},
     },
 }
 
@@ -54,9 +70,9 @@ class SMLogger(metaclass=SingletonMeta):
     def __init__(self):
         root_logger = logging.getLogger()
         logging.config.dictConfig(LOG_CONFIG)
-        root_logger.setLevel("DEBUG")
+        root_logger.setLevel(os.getenv("SM_LOG_LEVEL", "DEBUG"))
         self.logger = logging.getLogger("server-manager")
-        self.logger.setLevel("DEBUG")
+        self.logger.setLevel(os.getenv("SM_LOG_LEVEL", "DEBUG"))
 
     def debug(self, msg: str, *args, **kwargs):
         message = f"\x1b[90m\x1b[3m{msg}\x1b[0m"

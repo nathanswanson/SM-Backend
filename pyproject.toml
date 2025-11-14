@@ -44,12 +44,11 @@ config-path = "ruff.toml"
 # dev
 [tool.hatch.envs.default]
 dependencies = [
-    "datamodel-code-generator",
     "debugpy",
-    "python-dotenv",
     "pytest",
     "pytest-asyncio",
-    "websocket-client",
+    "pytest-cov",
+    "requests-mock",
 ]
 include = ["src/*.py", "src/resources/*"]
 
@@ -59,3 +58,4 @@ debug = "python -Xfrozen_modules=off -m debugpy --listen 0.0.0.0:5678  -m uvicor
 # test
 [tool.hatch.envs.hatch-test]
 dependencies = ["pytest", "pytest-asyncio"]
+extra-args = "--cov=tests/"

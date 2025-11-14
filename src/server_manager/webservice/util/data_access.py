@@ -21,34 +21,26 @@ from sqlmodel import Session, SQLModel, create_engine, func, select
 
 from server_manager.webservice.db_models import (
     Nodes,
-    NodesBase,
+    NodesCreate,
     NodesRead,
     Servers,
-    ServersBase,
+    ServersCreate,
     ServersRead,
-    ServerUserLink,
     Templates,
     TemplatesBase,
     TemplatesRead,
     Users,
-    UsersBase,
+    UsersCreate,
     UsersRead,
 )
 from server_manager.webservice.util.singleton import SingletonMeta
 
 
 class DB(metaclass=SingletonMeta):
-    def __init__(self):
-        self._engine = create_engine(os.environ["SM_DB_CONNECTION"])
+    def __init__(self, verbose: bool = False):
+        self._engine = create_engine(os.environ["SM_DB_CONNECTION"], echo=verbose)
 
         SQLModel.metadata.create_all(self._engine)
-
-    def create(self, obj: Servers | Users | Templates | Nodes):
-        with Session(self._engine) as session:
-            session.add(obj)
-            session.commit()
-            session.refresh(obj)
-            return obj
 
     def unused_port(self, count: int = 1) -> list[int] | None:
         with Session(self._engine) as session:
@@ -73,32 +65,52 @@ class DB(metaclass=SingletonMeta):
         return None
 
     # server
-    def create_server(self, server: ServersBase, **kwargs) -> Servers:
+    def create_server(self, server: ServersCreate, **kwargs) -> ServersRead:
         with Session(self._engine) as session:
-            server = Servers.model_validate(server, update=kwargs)
-            session.add(server)
+            db_server = Servers.model_validate(server, update=kwargs)
+            session.add(db_server)
             session.commit()
-            session.refresh(server)
-            return server
+            session.refresh(db_server)
+            return cast(ServersRead, db_server)
 
-    def get_server(self, server_id: int) -> Servers | None:
+    def get_server(self, server_id: int) -> ServersRead | None:
         with Session(self._engine) as session:
             statement = sqlmodel.select(Servers).where(Servers.id == server_id)
-            return session.exec(statement).first()
+            server = session.exec(statement).first()
+            return cast(ServersRead | None, server)
 
-    def get_server_by_name(self, name: str) -> Servers | None:
+    def get_server_by_name(self, name: str) -> ServersRead | None:
         with Session(self._engine) as session:
             statement = sqlmodel.select(Servers).where(Servers.name == name)
-            return session.exec(statement).first()
+            server = session.exec(statement).first()
+            return cast(ServersRead | None, server)
 
-    def get_server_list(self, owner: Users) -> Sequence[ServersRead]:
+    def get_all_servers(self) -> Sequence[ServersRead]:
         with Session(self._engine) as session:
-            # if admin just give every one
-            if owner.admin:
-                statement = sqlmodel.select(Servers)
-            else:
-                statement = sqlmodel.select(Servers).join(ServerUserLink).where(ServerUserLink.user_id == owner.id)
+            statement = sqlmodel.select(Servers)
             return cast(Sequence[ServersRead], session.exec(statement).all())
+
+    def get_server_list(self, owner_id: int) -> list[ServersRead]:
+        with Session(self._engine) as session:
+            user_obj = session.get(Users, owner_id)
+
+            if user_obj is None:
+                return []
+            return cast(list[ServersRead], user_obj.linked_servers)
+
+    def add_user_to_server(self, server_id: int, user_id: int) -> None:
+        with Session(self._engine) as session:
+            server_obj = session.get(Servers, server_id)
+            if server_obj is None:
+                raise HTTPException(status_code=404, detail="Server not found")
+
+            user_obj = session.get(Users, user_id)
+            if user_obj is None:
+                raise HTTPException(status_code=404, detail="User not found")
+
+            server_obj.linked_users.append(user_obj)
+            session.add(server_obj)
+            session.commit()
 
     def delete_server(self, server_id: int) -> bool:
         with Session(self._engine) as session:
@@ -110,30 +122,35 @@ class DB(metaclass=SingletonMeta):
         return False
 
     # user
-    def create_user(self, user: UsersBase | Users) -> UsersRead:
+    def create_user(self, user: UsersCreate, password: str) -> UsersRead:
         with Session(self._engine) as session:
-            user.admin = False  # admins must be added manually
-            user = Users.model_validate(user)
-            session.add(user)
+            db_user = Users.model_validate(user, update={"hashed_password": password})
+            db_user.admin = False  # admins must be added manually
+            session.add(db_user)
             session.commit()
-            session.refresh(user)
-            return cast(UsersRead, user)
+            session.refresh(db_user)
+            return cast(UsersRead, db_user)
 
-    def get_user_by_username(self, username: str) -> Users | None:
+    def lookup_username(self, username: str) -> Users | None:
         with Session(self._engine) as session:
             statement = sqlmodel.select(Users).where(Users.username == username)
-            return cast(Users | None, session.exec(statement).first())
+            return session.exec(statement).first()
 
-    def get_user(self, user_id: int) -> UsersRead | None:
+    def get_user(self, user_id: int, full_data: bool = False) -> UsersRead | Users | None:
         with Session(self._engine) as session:
             statement = sqlmodel.select(Users).where(Users.id == user_id)
-            return cast(UsersRead | None, session.exec(statement).first())
+            return (
+                cast(UsersRead | None, session.exec(statement).first())
+                if full_data is False
+                else session.get(Users, user_id)
+            )
 
     def delete_user(self, user_id: int) -> bool:
         with Session(self._engine) as session:
             user_obj = session.get(Users, user_id)
             if user_obj is not None:
                 session.delete(user_obj)
+                session.commit()
                 return True
         return False
 
@@ -200,7 +217,7 @@ class DB(metaclass=SingletonMeta):
 
     # node
 
-    def create_node(self, node: NodesBase) -> NodesRead:
+    def create_node(self, node: NodesCreate) -> NodesRead:
         with Session(self._engine) as session:
             mapped_node = Nodes.model_validate(node)
             session.add(mapped_node)
@@ -228,15 +245,9 @@ class DB(metaclass=SingletonMeta):
             node_obj = session.get(Nodes, node_id)
             if node_obj is not None:
                 session.delete(node_obj)
+                session.commit()
                 return True
         return False
 
-    def exec_raw(self, query: str):
-        if self._engine.dialect.name == "sqlite":
-            conn = self._engine.raw_connection()
-            try:
-                cursor = conn.cursor()
-                cursor.executescript(query)
-                conn.commit()
-            finally:
-                conn.close()
+    def reset_database(self):
+        sqlmodel.SQLModel.metadata.drop_all(self._engine)

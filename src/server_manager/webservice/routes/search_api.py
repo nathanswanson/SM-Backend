@@ -30,7 +30,9 @@ def search(current_user: Annotated[Users, Depends(auth_get_active_user)]):
 @router.get("/servers/", response_model=ServerListResponse)
 def search_servers(current_user: Annotated[Users, Depends(auth_get_active_user)]):
     """Search for servers by name"""
-    return ServerListResponse(items={server.name: server.id for server in DB().get_server_list(current_user)})
+    if current_user.id is None:
+        raise HTTPException(status_code=400, detail="Failed to get current user ID")
+    return ServerListResponse(items={server.name: server.id for server in DB().get_server_list(current_user.id)})
 
 
 @router.get("/fs/{server_id}/{path:path}", response_model=ServerFileListResponse)

@@ -22,6 +22,13 @@ class NodeUserLink(SQLModel, table=True):
     user_id: Optional[int] = Field(default=None, foreign_key="users.id", primary_key=True, description="User ID")
 
 
+class UsersGroupUsersLink(SQLModel, table=True):
+    user_id: Optional[int] = Field(default=None, foreign_key="users.id", primary_key=True, description="User ID")
+    group_id: Optional[int] = Field(
+        default=None, foreign_key="usersgroup.id", primary_key=True, description="User Group Scope ID"
+    )
+
+
 class TemplatesBase(SQLModel):
     name: str = Field(index=True, nullable=False, unique=True, description="Template name")
     image: str = Field(nullable=False, description="Docker image name")
@@ -61,18 +68,39 @@ class TemplatesRead(TemplatesBase):
     id: int
 
 
+class UsersGroupBase(SQLModel):
+    group_name: str = Field(index=True, nullable=False, unique=True, description="User Group Name")
+
+
+class UsersGroup(UsersGroupBase, table=True):
+    id: Optional[int] = Field(primary_key=True, default=None, nullable=False, description="User Group Scope ID")
+
+    scopes: list[str] | None = Field(description="List of scopes assigned to the user group ", sa_column=Column(JSON))
+    linked_users: list["Users"] = Relationship(back_populates="linked_user_groups", link_model=UsersGroupUsersLink)
+
+
+class UsersGroupCreate(UsersGroupBase):
+    pass
+
+
+class UsersGroupRead(UsersGroupBase):
+    id: int
+
+
 class UsersBase(SQLModel):
     username: str = Field(index=True, nullable=False, unique=True, description="Username")
     disabled: bool = Field(default=True)
+    scopes: list[str] | None = Field(description="List of scopes assigned to the user ", sa_column=Column(JSON))
     admin: bool = Field(default=False)
 
 
 class Users(UsersBase, table=True):
     # sql specific
-    id: Optional[int] = Field(primary_key=True, nullable=False, unique=True, description="User ID")
+    id: Optional[int] = Field(primary_key=True, nullable=False, unique=True, default=None, description="User ID")
     linked_servers: list["Servers"] = Relationship(back_populates="linked_users", link_model=ServerUserLink)
     linked_templates: list["Templates"] = Relationship(back_populates="linked_users", link_model=TemplateUserLink)
     linked_nodes: list["Nodes"] = Relationship(back_populates="linked_users", link_model=NodeUserLink)
+    linked_user_groups: list["UsersGroup"] = Relationship(back_populates="linked_users", link_model=UsersGroupUsersLink)
     # private fields
     hashed_password: str
 

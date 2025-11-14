@@ -6,7 +6,7 @@ from http import HTTPStatus
 
 import requests
 
-from server_manager.webservice.db_models import Servers
+from server_manager.webservice.db_models import Servers, ServersRead
 from server_manager.webservice.docker_interface.docker_container_api import docker_container_name_exists
 from server_manager.webservice.logger import sm_logger
 from server_manager.webservice.util.data_access import DB
@@ -86,7 +86,7 @@ class ServerRouter(metaclass=SingletonMeta):
         else:
             return response.status_code == HTTPStatus.OK
 
-    async def open_ports(self, server: Servers) -> bool:
+    async def open_ports(self, server: ServersRead) -> bool:
         # docker -> caddy no port forward, docker network instead.
         # exposed ports should not be changed. minecraft example:
         # exposed (internal)25565 -> (docker net)25565 -> (caddy)30050

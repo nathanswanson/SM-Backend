@@ -11,7 +11,7 @@ import subprocess
 
 from fastapi import APIRouter, HTTPException
 
-from server_manager.webservice.db_models import NodesBase, NodesRead
+from server_manager.webservice.db_models import NodesCreate, NodesRead
 from server_manager.webservice.logger import sm_logger
 from server_manager.webservice.models import NodeDiskUsageResponse, NodeUptimeResponse
 from server_manager.webservice.util.data_access import DB
@@ -22,9 +22,8 @@ _runtime_pattern = re.compile(
 )
 
 
-
 @router.post("/", response_model=NodesRead)
-def add_node(node: NodesBase) -> NodesRead | None:
+def add_node(node: NodesCreate) -> NodesRead | None:
     """add a new node"""
     ret = DB().create_node(node)
     if ret:

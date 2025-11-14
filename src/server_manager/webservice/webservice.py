@@ -22,10 +22,9 @@ from server_manager.webservice.routes import (
     template_api,
     volumes_api,
 )
-from server_manager.webservice.routes.managment_api import oauth2_wrapper
+from server_manager.webservice.util.auth import oauth2_wrapper
 from server_manager.webservice.util.dev import dev_startup
 from server_manager.webservice.util.env_check import startup_info
-from server_manager.webservice.util.recovery import recovery
 
 # main app
 app = FastAPI(root_path="/api")
@@ -56,15 +55,6 @@ app.include_router(volumes_api.router, **oauth2_wrapper, prefix="/volumes", tags
 app.include_router(graphql.router, prefix="/graphql", tags=["graphql"])
 
 
-# # frontend
-# # has to be last to not override other routes
-# STATIC_PATH = os.environ.get("SM_STATIC_PATH", "NULL")
-
-# if Path(STATIC_PATH) != Path("NULL"):
-#     app.mount("/", StaticFiles(directory=STATIC_PATH, html=True), name="static")
-# app.add_middleware(GZipMiddleware, minimum_size=1000)
-
-
 def generate_operation_id():
     """Generate a unique operation ID"""
 
@@ -75,6 +65,5 @@ def generate_operation_id():
 
 generate_operation_id()
 startup_info()
-recovery()
 if os.environ.get("SM_ENV") == "DEV":
     dev_startup()

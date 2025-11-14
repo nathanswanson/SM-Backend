@@ -1,3 +1,4 @@
 dist/
 sm-data/
 __pycache__
+.coverage*

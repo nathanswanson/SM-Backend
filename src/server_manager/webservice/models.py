@@ -113,11 +113,13 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: str
+    scopes: list[str] = []
 
 
 class CreateUserRequest(BaseModel):
     username: str
     password: SecretStr
+    scopes: list[str]
 
 
 class UserListResponse(StringToIDMapModel):
