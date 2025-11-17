@@ -7,8 +7,8 @@ Author: Nathan Swanson
 """
 
 import os
-from collections.abc import Sequence
-from typing import cast
+from collections.abc import Generator, Sequence
+from typing import Any, cast
 
 import sqlalchemy
 import sqlalchemy.exc
@@ -159,7 +159,7 @@ class DB(metaclass=SingletonMeta):
         self,
         template: TemplatesCreate,
         **kwargs,
-    ):
+    ) -> TemplatesRead:
         with Session(self._engine) as session:
             try:
                 mapped_template = Templates.model_validate(template, update=kwargs)
@@ -174,7 +174,7 @@ class DB(metaclass=SingletonMeta):
                 raise HTTPException(status_code=500, detail="failed to create template") from e
             except ValidationError as e:
                 raise HTTPException(status_code=500, detail=f"failed to validate Template error: {e}") from e
-            return mapped_template
+            return cast(TemplatesRead, mapped_template)
 
     def get_template(self, template_id: int) -> Templates | None:
         with Session(self._engine) as session:
@@ -250,3 +250,11 @@ class DB(metaclass=SingletonMeta):
 
     def reset_database(self):
         sqlmodel.SQLModel.metadata.drop_all(self._engine)
+
+
+def get_db() -> Generator[DB, Any, None]:
+    db = DB()
+    try:
+        yield db
+    finally:
+        pass

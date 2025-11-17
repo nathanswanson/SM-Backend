@@ -64,19 +64,6 @@ class ServerRouter(metaclass=SingletonMeta):
             return response.status_code == HTTPStatus.OK
         return False
 
-    def ping_caddy(self) -> bool:
-        try:
-            response = requests.get(f"http://{CADDY_URL}/config", timeout=5)
-
-            if response.status_code == requests.HTTPError:
-                sm_logger.error("Caddy ping failed with status code: %s", response.status_code)
-                return False
-        except requests.RequestException:
-            sm_logger.exception("Error pinging Caddy")
-        else:
-            return response.status_code == HTTPStatus.OK
-        return False
-
     def close_ports(self, server: ServersRead) -> bool:
         try:
             response = requests.delete(_container_exists_config_url(server.container_name), timeout=5)
@@ -86,14 +73,14 @@ class ServerRouter(metaclass=SingletonMeta):
         else:
             return response.status_code == HTTPStatus.OK
 
-    async def open_ports(self, server: ServersRead) -> bool:
+    async def open_ports(self, server: ServersRead | None) -> bool:
         # docker -> caddy no port forward, docker network instead.
         # exposed ports should not be changed. minecraft example:
         # exposed (internal)25565 -> (docker net)25565 -> (caddy)30050
         #             container_name:25565 -> host_name:30050
         # template tracks the exposed port, server the caddy port
         if server is None:
-            sm_logger.warning("Server %s has no ports to open.", server.name)
+            sm_logger.warning("Failed to open ports: server is None")
             return False
         template = DB().get_template(server.template_id)
         if (

@@ -28,7 +28,9 @@ _SECRET_KEY = os.environ["SM_SECRET_KEY"]
 
 _salt = bcrypt.gensalt()
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="users/token", scopes={"me": "Read information about the current user"})
+oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="users/token", scopes={"management.me": "Read information about the current user"}
+)
 oauth2_wrapper: dict = {"dependencies": [Depends(oauth2_scheme)]}
 
 
@@ -78,7 +80,7 @@ def auth_user(username: str, password: str):
 def create_user(username: str, password: str, scopes: list[str]):
     """create a new user with disabled=True by default"""
     user: UsersCreate = UsersCreate(username=username, scopes=scopes, disabled=True, admin=False)
-    return DB().create_user(user, password=password)
+    return DB().create_user(user, password=get_password_hash(password))
 
 
 def create_access_token(data: dict, expired_delta: timedelta | None = None):
@@ -90,7 +92,7 @@ def create_access_token(data: dict, expired_delta: timedelta | None = None):
         else datetime.now(UTC) + timedelta(minutes=_ACCESS_TOKEN_EXPIRE_MINUTES)
     )
     to_encode.update({"exp": expire})
-    to_encode.update({"scopes": data.get("scopes", "me")})
+    to_encode.update({"scopes": data.get("scopes", "")})
 
     return jwt.encode(to_encode, _SECRET_KEY, algorithm=_ALGORITHM)
 
@@ -126,8 +128,8 @@ async def auth_get_user(security_scopes: SecurityScopes, token: Annotated[str, D
     try:
         payload = verify_token(token, credentials_exception=credentials_exception)
         scope = payload.get("scopes", "")
-        print(scope)
-        token_scopes = scope.split() if scope else []
+
+        token_scopes = scope
         token_data = TokenData(scopes=token_scopes, username=payload.get("sub"))
     except Exception:  # noqa: BLE001
         raise credentials_exception  # noqa: B904
@@ -145,7 +147,7 @@ async def auth_get_user(security_scopes: SecurityScopes, token: Annotated[str, D
     return user
 
 
-async def auth_get_active_user(current_user: Annotated[Users, Security(auth_get_user, scopes=["me"])]):
+async def auth_get_active_user(current_user: Annotated[Users, Security(auth_get_user, scopes=["management.me"])]):
     """get active user, raise exception if user is disabled"""
     if current_user.disabled:
         raise HTTPException(status_code=400, detail="Disabled account")
@@ -162,5 +164,7 @@ async def auth_aquire_access_token(form_data: Annotated[OAuth2PasswordRequestFor
             headers={"WWW-Authenticate": "Bearer"},
         )
     access_token_expire = timedelta(minutes=_ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(data={"sub": user.username}, expired_delta=access_token_expire)
+    access_token = create_access_token(
+        data={"sub": user.username, "scopes": user.scopes}, expired_delta=access_token_expire
+    )
     return Token(access_token=access_token, token_type="bearer", expire_time=access_token_expire.seconds)  # noqa: S106, not a password

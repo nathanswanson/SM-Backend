@@ -49,6 +49,8 @@ dependencies = [
     "pytest-asyncio",
     "pytest-cov",
     "requests-mock",
+    "pytest-mock",
+    "pytest-xdist",
 ]
 include = ["src/*.py", "src/resources/*"]
 
@@ -57,5 +59,24 @@ debug = "python -Xfrozen_modules=off -m debugpy --listen 0.0.0.0:5678  -m uvicor
 
 # test
 [tool.hatch.envs.hatch-test]
-dependencies = ["pytest", "pytest-asyncio"]
-extra-args = "--cov=tests/"
+dependencies = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+    "pytest-mock",
+    "pytest-xdist",
+    "requests-mock",
+]
+
+[tool.pytest.ini_options]
+addopts = "-n auto --cov=./src/server_manager/ --cov-branch --cov-config=./pyproject.toml --cov-report=term-missing"
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.coverage.run]
+source = ["src/server_manager", "tests"]
+omit = [
+    "src/server_manager/__about__.py",
+    "src/server_manager/__main__.py",
+    "src/server_manager/cli/__init__.py",
+]

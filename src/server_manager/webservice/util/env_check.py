@@ -2,6 +2,8 @@ import os
 import sys
 
 from colorama import Fore
+from fastapi import FastAPI
+from fastapi.routing import APIRoute
 
 from server_manager.webservice.logger import sm_logger
 
@@ -35,3 +37,11 @@ def check_mount_path():
         sm_logger.error(f"Mount path {mount_path} is not writable. Please check permissions.")
         sys.exit(1)
     sm_logger.info(f"Mount path {mount_path} is valid and writable.")
+
+
+def generate_operation_id(app: FastAPI):
+    """Generate a unique operation ID"""
+
+    for route in app.routes:
+        if isinstance(route, APIRoute):
+            route.operation_id = route.name

@@ -1,3 +1,5 @@
+from server_manager.webservice.routes.search_api import ServerFileListResponse
+
 TEST_USER = {"username": "testuser", "scopes": [""], "hashed_password": "hashed", "admin": False}
 TEST_NODE = {
     "name": "test-node",
@@ -30,3 +32,11 @@ TEST_SERVER = {
     "template_id": 1,
     "env": {"TEST": "value"},
 }
+TEST_SERVER_READ = TEST_SERVER | {"id": 1, "port": [30001]}
+TEST_USER_READ = TEST_USER | {"id": 1}
+TEST_NODE_READ = TEST_NODE | {"id": 1}
+TEST_TEMPLATE_READ = TEST_TEMPLATE | {"id": 1}
+
+MOCK_FILE_DATA: ServerFileListResponse = ServerFileListResponse(
+    items=["file1.txt", "file2.txt", "folder1/", "folder2/"]
+)

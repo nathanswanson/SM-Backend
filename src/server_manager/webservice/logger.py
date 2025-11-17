@@ -74,30 +74,30 @@ class SMLogger(metaclass=SingletonMeta):
         self.logger = logging.getLogger("server-manager")
         self.logger.setLevel(os.getenv("SM_LOG_LEVEL", "DEBUG"))
 
-    def debug(self, msg: str, *args, **kwargs):
+    def debug(self, msg: str, *args, **kwargs):  # pragma: no cover
         message = f"\x1b[90m\x1b[3m{msg}\x1b[0m"
         self.logger.debug(message, *args, **kwargs)
 
-    def info(self, msg: str, *args, **kwargs):
+    def info(self, msg: str, *args, **kwargs):  # pragma: no cover
         self.logger.info(msg, *args, **kwargs)
 
-    def warning(self, msg: str, *args, **kwargs):
+    def warning(self, msg: str, *args, **kwargs):  # pragma: no cover
         message = f"\x1b[33m{msg}\x1b[0m"
         self.logger.warning(message, *args, **kwargs)
 
-    def critical(self, msg: str, *args, **kwargs):
+    def critical(self, msg: str, *args, **kwargs):  # pragma: no cover
         message = f"\x1b[31m{msg}\x1b[0m"
         self.logger.critical(message, *args, **kwargs)
 
-    def exception(self, msg: str, *args, **kwargs):
+    def exception(self, msg: str, *args, **kwargs):  # pragma: no cover
         message = f"\x1b[31m{msg}\x1b[0m"
         self.logger.exception(message, *args, **kwargs)
 
-    def error(self, msg: str, *args, **kwargs):
+    def error(self, msg: str, *args, **kwargs):  # pragma: no cover
         message = f"\x1b[31m{msg}\x1b[0m"
         self.logger.error(message, *args, **kwargs)
 
-    def log_group(self, message: str, child_messages):
+    def log_group(self, message: str, child_messages):  # pragma: no cover
         full_message = message + "\n"
         for child_message in child_messages:
             full_message += f"┕   {child_message}\n"

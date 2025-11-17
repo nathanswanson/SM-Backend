@@ -1,6 +1,5 @@
 # filepath: /home/wsl/Textual/server-manager/builder/SM-Backend/src/server_manager/webservice/util/test_auth.py
 from datetime import UTC, datetime, timedelta
-from unittest.mock import MagicMock
 
 import jwt
 import pytest
@@ -11,6 +10,7 @@ from server_manager.webservice.db_models import UsersRead
 from server_manager.webservice.util.auth import (
     _ALGORITHM,
     _SECRET_KEY,
+    auth_user,
     create_access_token,
     create_user,
     get_password_hash,
@@ -41,12 +41,63 @@ def test_create_access_token():
     assert "exp" in decoded_token
 
 
-def test_user_disabled_by_default(monkeypatch):
+def test_verify_password_invalid_hash():
+    """
+    Tests that verify_password returns False for an invalid hashed password.
+    """
+    password = "testpassword"
+    invalid_hashed_password = "invalidhash"
+    assert not verify_password(password, invalid_hashed_password)
+
+
+def test_auth_user_success(mocker, monkeypatch):
+    """
+    Tests that auth_user returns the user when authentication is successful.
+    """
+    # 1. Create a mock DB instance that will be returned by DB()
+    mock_db_instance = mocker.MagicMock()
+    mock_user = mocker.MagicMock()
+    mock_user.hashed_password = get_password_hash("correctpassword")
+    mock_db_instance.lookup_username.return_value = mock_user
+
+    # 2. Patch the DB class in the 'auth' module.
+    #    When DB() is called, it will now return our mock_db_instance instead.
+    monkeypatch.setattr("server_manager.webservice.util.auth.DB", lambda: mock_db_instance)
+
+    # 3. Run the test - this now calls the mock object's method
+    result = auth_user("testuser", "correctpassword")
+
+    # 4. Assertions
+    assert result == mock_user
+    mock_db_instance.lookup_username.assert_called_once_with("testuser")
+
+
+def test_auth_user_not_found(mocker, monkeypatch):
+    """
+    Tests that auth_user returns False when the user is not found.
+    """
+    # 1. Create a mock DB instance that will be returned by DB()
+    mock_db_instance = mocker.MagicMock()
+    mock_db_instance.lookup_username.return_value = None
+
+    # 2. Patch the DB class in the 'auth' module.
+    #    When DB() is called, it will now return our mock_db_instance instead.
+    monkeypatch.setattr("server_manager.webservice.util.auth.DB", lambda: mock_db_instance)
+
+    # 3. Run the test - this now calls the mock object's method
+    result = auth_user("nonexistentuser", "somepassword")
+
+    # 4. Assertions
+    assert result is False
+    mock_db_instance.lookup_username.assert_called_once_with("nonexistentuser")
+
+
+def test_user_disabled_by_default(mocker, monkeypatch):
     """
     Tests that a newly created user is disabled by default without DB calls.
     """
     # 1. Create a mock DB instance that will be returned by DB()
-    mock_db_instance = MagicMock()
+    mock_db_instance = mocker.MagicMock()
 
     # 2. Configure the mock's create_user method to simulate the real one
     def mock_create_user_func(user, password):  # noqa: ARG001 mock function must match signature

@@ -9,7 +9,7 @@ Author: Nathan Swanson
 import os
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Security
+from fastapi import APIRouter, Depends, Security
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
@@ -20,7 +20,7 @@ from server_manager.webservice.util.auth import (
     auth_get_active_user,
     create_user,
 )
-from server_manager.webservice.util.data_access import DB
+from server_manager.webservice.util.data_access import DB, get_db
 
 router = APIRouter()
 dev_mode = os.environ.get("SM_ENV") == "DEV"
@@ -37,12 +37,12 @@ async def create_user_account(create_user_request: CreateUserRequest):
 @router.delete("/", response_model=dict)
 async def delete_user_account(
     current_user: Annotated[Users, Security(auth_get_active_user, scopes=["management.delete_user"])],
+    db: Annotated[DB, Depends(get_db)],
 ):
     """delete current user account"""
     # delete user from db
-    if current_user.id is None:
-        raise HTTPException(status_code=400, detail="Invalid user ID")
-    DB().delete_user(current_user.id)
+    assert current_user.id is not None
+    db.delete_user(current_user.id)
     return {"message": "User deleted successfully"}
 
 

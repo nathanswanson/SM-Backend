@@ -8,13 +8,14 @@ Author: Nathan Swanson
 
 import re
 import subprocess
+from typing import Annotated
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from server_manager.webservice.db_models import NodesCreate, NodesRead
 from server_manager.webservice.logger import sm_logger
 from server_manager.webservice.models import NodeDiskUsageResponse, NodeUptimeResponse
-from server_manager.webservice.util.data_access import DB
+from server_manager.webservice.util.data_access import DB, get_db
 
 router = APIRouter()
 _runtime_pattern = re.compile(
@@ -23,19 +24,22 @@ _runtime_pattern = re.compile(
 
 
 @router.post("/", response_model=NodesRead)
-def add_node(node: NodesCreate) -> NodesRead | None:
+def add_node(node: NodesCreate, db: Annotated[DB, Depends(get_db)]) -> NodesRead | None:
     """add a new node"""
-    ret = DB().create_node(node)
+    ret = db.create_node(node)
     if ret:
         return ret
     return None
 
 
 @router.get("/{node_id}", response_model=NodesRead)
-def get_node(node_id: int) -> NodesRead | None:
+def get_node(
+    node_id: int,
+    db: Annotated[DB, Depends(get_db)],
+) -> NodesRead | None:
     """return hardware information in form of a Nodes object
     fields: id, name, architecture, cpu_cores, memory, disk, cpu_name"""
-    ret = DB().get_node(node_id)
+    ret = db.get_node(node_id)
     if ret is None:
         raise HTTPException(status_code=404, detail="Node not found")
     return ret
@@ -53,7 +57,7 @@ def disk_usage(node_id: int):  # noqa: ARG001
     command = ["df", "-l", "--exclude={tmpfs,devtmpfs}", "--total"]
     ret = subprocess.run(command, check=True, stdout=subprocess.PIPE)
     if ret is None or ret.stdout is None:
-        return (-1, -1)
+        return NodeDiskUsageResponse(used=-1, total=-1)
     output = ret.stdout.decode("utf-8").strip().split("\n")[-1].split()
     used_disk = int(output[2] or -1)
     total_disk = int(output[3] or -1)
@@ -68,11 +72,11 @@ def runtime(node_id: int):  # noqa: ARG001
     command = ["/usr/bin/uptime"]
     ret = subprocess.run(command, check=True, stdout=subprocess.PIPE)
     if ret is None or ret.stdout is None:
-        return -1
+        return NodeUptimeResponse(uptime_hours=-1)
     output = ret.stdout.decode("utf-8")
     matches = _runtime_pattern.match(output)
     if not matches:
-        return -1
+        return NodeUptimeResponse(uptime_hours=-1)
     time = int(matches.group(1)) * 24 + int(matches.group(2))
 
     try:
