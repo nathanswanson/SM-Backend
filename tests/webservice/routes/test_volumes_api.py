@@ -108,6 +108,7 @@ def test_read_file_zero_size_returns_500(test_client_no_auth, mock_db, mocker):
     assert response.json()["detail"] == "failed to read file size"
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_upload_file_pushes_tar_to_docker(test_client_no_auth, mock_db, mocker):
     mock_db.get_server.return_value = SimpleNamespace(container_name="mc")
     docker_upload = mocker.patch(
@@ -128,6 +129,7 @@ def test_upload_file_pushes_tar_to_docker(test_client_no_auth, mock_db, mocker):
     docker_upload.assert_awaited_once()
 
 
+@pytest.mark.filterwarnings("ignore::DeprecationWarning")
 def test_upload_file_missing_server_returns_404(test_client_no_auth, mock_db):
     mock_db.get_server.return_value = None
 

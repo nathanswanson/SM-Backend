@@ -14,7 +14,6 @@ from server_manager.webservice.docker_interface.docker_container_api import (
 )
 from server_manager.webservice.models import (
     ContainerCommandResponse,
-    ServerCreateResponse,
     ServerDeleteResponse,
     ServerStartResponse,
     ServerStatusResponse,
@@ -38,15 +37,13 @@ async def create_server(server: ServersCreate, current_user: Annotated[Users, De
     existing_server = DB().get_server_by_name(server.name)
     if existing_server:
         raise HTTPException(status_code=400, detail="Server with that name already exists")
-    if template:
-        docker_ret = await docker_container_create(server.name, template.image, server.env, server_link=server.name)
-        if not docker_ret:
-            raise HTTPException(status_code=500, detail="Failed to create Docker container")
-        return DB().create_server(
-            server, port=DB().unused_port(len(template.exposed_port)), linked_users=[current_user]
-        )
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
 
-    return ServerCreateResponse(success=False)
+    docker_ret = await docker_container_create(server.name, template.image, server.env, server_link=server.name)
+    if not docker_ret:
+        raise HTTPException(status_code=500, detail="Failed to create Docker container")
+    return DB().create_server(server, port=DB().unused_port(len(template.exposed_port)), linked_users=[current_user])
 
 
 @router.get("/{server_id}", response_model=ServersRead)

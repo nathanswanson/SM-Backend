@@ -62,8 +62,8 @@ def test_create_server_returns_false_when_template_missing(test_client_no_auth, 
 
     response = test_client_no_auth.post("/servers/", json=TEST_SERVER)
 
-    assert response.status_code == 200
-    assert response.json() == {"success": False}
+    assert response.status_code == 404
+    assert response.json()["detail"] == "Template not found"
 
 
 def test_delete_server_removes_container_and_record(test_client_no_auth, mock_db, mocker):

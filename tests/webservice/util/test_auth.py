@@ -1,19 +1,25 @@
 # filepath: /home/wsl/Textual/server-manager/builder/SM-Backend/src/server_manager/webservice/util/test_auth.py
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
+from typing import cast
 
 import jwt
 import pytest
-from fastapi import HTTPException
-from starlette import status
+from fastapi import HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm, SecurityScopes
 
-from server_manager.webservice.db_models import UsersRead
+from server_manager.webservice.db_models import Users, UsersRead
 from server_manager.webservice.util.auth import (
     _ALGORITHM,
     _SECRET_KEY,
+    auth_aquire_access_token,
+    auth_get_active_user,
+    auth_get_user,
     auth_user,
     create_access_token,
     create_user,
     get_password_hash,
+    secure_scope,
     verify_password,
     verify_token,
 )
@@ -187,3 +193,88 @@ def test_verify_token_invalid(monkeypatch):
     with pytest.raises(HTTPException) as excinfo:
         verify_token(token, credentials_exception=credentials_exception)
     assert excinfo.value.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_secure_scope_with_and_without_scopes():
+    result = secure_scope("management.me", dependencies=None)
+    assert "dependencies" in result
+
+    extra = object()
+    scoped = secure_scope([], dependencies=[extra])
+    assert scoped["dependencies"][-1] is extra
+
+
+@pytest.mark.asyncio
+async def test_auth_get_user_success(monkeypatch, mocker):
+    user = UsersRead(id=1, username="user", scopes=["management.me"], disabled=False, admin=False)
+    mock_db = mocker.MagicMock()
+    mock_db.lookup_username.return_value = user
+    monkeypatch.setattr("server_manager.webservice.util.auth.DB", lambda: mock_db)
+    monkeypatch.setattr(
+        "server_manager.webservice.util.auth.verify_token",
+        lambda token, credentials_exception: {"sub": "user", "scopes": ["management.me"]},
+    )
+
+    result = await auth_get_user(SecurityScopes(scopes=["management.me"]), token="token")
+
+    assert result is user
+
+
+@pytest.mark.asyncio
+async def test_auth_get_user_missing_scope(monkeypatch, mocker):
+    user = UsersRead(id=1, username="user", scopes=["basic"], disabled=False, admin=False)
+    mock_db = mocker.MagicMock()
+    mock_db.lookup_username.return_value = user
+    monkeypatch.setattr("server_manager.webservice.util.auth.DB", lambda: mock_db)
+    monkeypatch.setattr(
+        "server_manager.webservice.util.auth.verify_token",
+        lambda token, credentials_exception: {"sub": "user", "scopes": ["basic"]},
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        await auth_get_user(SecurityScopes(scopes=["management.me"]), token="token")
+
+    assert exc.value.detail == "Not enough permissions"
+
+
+@pytest.mark.asyncio
+async def test_auth_get_user_missing_user(monkeypatch, mocker):
+    mock_db = mocker.MagicMock()
+    mock_db.lookup_username.return_value = None
+    monkeypatch.setattr("server_manager.webservice.util.auth.DB", lambda: mock_db)
+    monkeypatch.setattr(
+        "server_manager.webservice.util.auth.verify_token",
+        lambda token, credentials_exception: {"sub": "ghost", "scopes": []},
+    )
+
+    with pytest.raises(HTTPException):
+        await auth_get_user(SecurityScopes(scopes=[]), token="token")
+
+
+@pytest.mark.asyncio
+async def test_auth_get_active_user_rejects_disabled():
+    user = UsersRead(id=1, username="user", scopes=[], disabled=True, admin=False)
+
+    with pytest.raises(HTTPException):
+        await auth_get_active_user(cast(Users, user))
+
+
+@pytest.mark.asyncio
+async def test_auth_aquire_access_token_success(monkeypatch):
+    user = SimpleNamespace(username="user", scopes=["scope"], disabled=False)
+    monkeypatch.setattr("server_manager.webservice.util.auth.auth_user", lambda u, p: user)
+
+    form = OAuth2PasswordRequestForm(username="user", password="pw", scope="")
+    token = await auth_aquire_access_token(form)
+
+    assert token.token_type == "bearer"
+    assert token.access_token
+
+
+@pytest.mark.asyncio
+async def test_auth_aquire_access_token_invalid(monkeypatch):
+    monkeypatch.setattr("server_manager.webservice.util.auth.auth_user", lambda u, p: False)
+
+    form = OAuth2PasswordRequestForm(username="user", password="pw", scope="")
+    with pytest.raises(HTTPException):
+        await auth_aquire_access_token(form)

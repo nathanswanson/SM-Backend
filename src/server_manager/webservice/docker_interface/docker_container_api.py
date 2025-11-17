@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 import subprocess
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, cast
 
 import aiodocker
 from fastapi import HTTPException
@@ -221,24 +221,28 @@ async def docker_container_inspect(container_name: str) -> HealthInfo | None:
     async with docker_container(container_name) as container:
         if container:
             info = await container.show()
-            health_logs = info["State"].get("Health")
-            if not health_logs or not len(health_logs):
+            health_state = info["State"].get("Health") if info and info.get("State") else None
+            logs = health_state.get("Log") if health_state else None
+            if not logs:
                 return None
-            health_data = info["State"]["Health"]["Log"][-1]
+            health_data = logs[-1]
             return HealthInfo.model_validate(health_data)
     return None
 
 
-async def docker_container_send_command(name: str, command: str):
+async def docker_container_send_command(name: str, command: str) -> bool:
     """send a command to a container"""
     async with docker_container(name) as container:
         # Get the raw socket
         if container:
-            sock = container.attach(
+            attach_result = container.attach(
                 stdin=True,
                 stdout=True,
                 stderr=True,
             )
+            sock = attach_result
+            if hasattr(attach_result, "__await__"):
+                sock = await cast(Any, attach_result)
 
             await sock.write_in(f"{command}\n".encode())
             return True
