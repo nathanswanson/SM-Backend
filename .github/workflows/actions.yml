@@ -31,7 +31,7 @@ jobs:
           python -m pip install hatchling build
       - name: Run Tests
         run: |
-          python -m test
+          python -m hatch test
       - name: Build
         run: |
           python -m build --wheel
