@@ -28,7 +28,7 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          python -m pip install hatchling build
+          python -m pip install hatch build
       - name: Run Tests
         run: |
           python -m hatch test
