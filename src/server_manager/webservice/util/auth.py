@@ -24,9 +24,8 @@ load_dotenv()
 
 _ALGORITHM = "HS256"
 _ACCESS_TOKEN_EXPIRE_MINUTES = 60
-_SECRET_KEY = os.environ["SM_SECRET_KEY"]
+_SECRET_KEY = os.environ.get("SM_SECRET_KEY", None)
 
-_salt = bcrypt.gensalt()
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="users/token", scopes={"management.me": "Read information about the current user"}
@@ -66,7 +65,10 @@ def verify_password(plain_password: str, hashed_password: str):
 
 def get_password_hash(password: str):
     """hash a password for storing"""
-    return bcrypt.hashpw(password.encode(), _salt).decode()
+    # Create a fresh salt for each password hash. This is done lazily
+    # so bcrypt.gensalt() is only called when a password needs hashing.
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password.encode(), salt).decode()
 
 
 def auth_user(username: str, password: str):
@@ -93,13 +95,18 @@ def create_access_token(data: dict, expired_delta: timedelta | None = None):
     )
     to_encode.update({"exp": expire})
     to_encode.update({"scopes": data.get("scopes", "")})
-
+    if _SECRET_KEY is None:
+        msg = "SM_SECRET_KEY environment variable not set, cannot create access token"
+        raise RuntimeError(msg)
     return jwt.encode(to_encode, _SECRET_KEY, algorithm=_ALGORITHM)
 
 
 def verify_token(token: str, credentials_exception: HTTPException):
     """verify a JWT token and return the payload"""
     try:
+        if _SECRET_KEY is None:
+            msg = "SM_SECRET_KEY environment variable not set, cannot verify access token"
+            raise RuntimeError(msg)
         payload = jwt.decode(token, _SECRET_KEY, algorithms=[_ALGORITHM])
         username: str = payload.get("sub")
         if username is None:

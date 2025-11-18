@@ -56,7 +56,6 @@ class Subscription:
 class Query:
     @strawberry.field
     async def get_metrics(self) -> str:
-        # Placeholder implementation; replace with actual metrics retrieval logic
         return "not used"
 
 
@@ -85,7 +84,7 @@ async def stats(container_name: str) -> AsyncGenerator[MetricsQL, None]:
     """
     Stream metrics from a container. `Notes`_
 
-    .. _Notes: https://docs.docker.com/reference/api/engine/version/v1.51/#tag/Container/operation/ContainerStats
+    .. _Notes: file://./db_models.py
     """
     if not container_name:
         sm_logger.debug("No container name provided for stats streaming.")

@@ -48,6 +48,7 @@ dependencies = [
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
+    "ruff",
     "requests-mock",
     "pytest-mock",
     "pytest-xdist",
@@ -56,6 +57,7 @@ include = ["src/*.py", "src/resources/*"]
 
 [tool.hatch.envs.default.scripts]
 debug = "python -Xfrozen_modules=off -m debugpy --listen 0.0.0.0:5678  -m uvicorn src.server_manager.webservice.webservice:app --reload --host 0.0.0.0 --port 8000"
+check = "ruff check --config=pyproject.toml"
 
 # test
 [tool.hatch.envs.hatch-test]
@@ -67,6 +69,7 @@ dependencies = [
     "pytest-xdist",
     "requests-mock",
 ]
+env_include = []
 
 [tool.pytest.ini_options]
 addopts = "-n auto --cov=./src/server_manager/ --cov-branch --cov-config=./pyproject.toml --cov-report=term-missing"
