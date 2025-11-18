@@ -29,6 +29,9 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           python -m pip install hatch build
+      - name: Lint Code
+        run: |
+          python -m hatch run check
       - name: Run Tests
         run: |
           python -m hatch test

@@ -10,13 +10,13 @@ from fastapi.security import OAuth2PasswordRequestForm, SecurityScopes
 from server_manager.webservice.db_models import Users, UsersRead
 from server_manager.webservice.util.auth import (
     _ALGORITHM,
-    _SECRET_KEY,
     auth_aquire_access_token,
     auth_get_active_user,
     auth_get_user,
     auth_user,
     create_access_token,
     create_user,
+    get_key,
     get_password_hash,
     secure_scope,
     verify_password,
@@ -27,6 +27,9 @@ from server_manager.webservice.util.auth import (
 @pytest.fixture
 def setup_secret_key(monkeypatch):
     monkeypatch.setenv("SM_SECRET_KEY", "testsecretkey")
+
+    yield
+    monkeypatch.delenv("SM_SECRET_KEY", raising=False)
 
 
 def test_password_hashing_and_verification():
@@ -47,8 +50,7 @@ def test_create_access_token():
     """
     data = {"sub": "testuser"}
     token = create_access_token(data)
-    assert _SECRET_KEY is not None
-    decoded_token = jwt.decode(token, _SECRET_KEY, algorithms=[_ALGORITHM])
+    decoded_token = jwt.decode(token, get_key(), algorithms=[_ALGORITHM])
     assert decoded_token["sub"] == "testuser"
     assert "exp" in decoded_token
 
@@ -129,8 +131,7 @@ def test_create_access_token_with_expiry():
     data = {"sub": "testuser"}
     expires_delta = timedelta(minutes=30)
     token = create_access_token(data, expired_delta=expires_delta)
-    assert _SECRET_KEY is not None
-    decoded_token = jwt.decode(token, _SECRET_KEY, algorithms=[_ALGORITHM])
+    decoded_token = jwt.decode(token, get_key(), algorithms=[_ALGORITHM])
     expire = decoded_token["exp"]
     expected_expire = datetime.now(UTC) + expires_delta
 
@@ -183,7 +184,7 @@ def test_verify_token_invalid(monkeypatch):
         verify_token(token, credentials_exception=credentials_exception)
     assert excinfo.value.status_code == status.HTTP_401_UNAUTHORIZED
 
-    monkeypatch.setattr("server_manager.webservice.util.auth._SECRET_KEY", "")
+    monkeypatch.setattr("server_manager.webservice.util.auth.get_key", lambda: "")
     with pytest.raises(HTTPException) as excinfo:
         verify_token(token, credentials_exception=credentials_exception)
     assert excinfo.value.status_code == status.HTTP_401_UNAUTHORIZED

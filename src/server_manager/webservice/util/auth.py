@@ -8,6 +8,7 @@ Author: Nathan Swanson
 
 import os
 from datetime import UTC, datetime, timedelta
+from functools import cache
 from typing import Annotated
 
 import bcrypt
@@ -17,6 +18,7 @@ from fastapi import Depends, HTTPException, Security, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, SecurityScopes
 
 from server_manager.webservice.db_models import Users, UsersCreate
+from server_manager.webservice.logger import sm_logger
 from server_manager.webservice.models import Token, TokenData
 from server_manager.webservice.util.data_access import DB
 
@@ -24,7 +26,6 @@ load_dotenv()
 
 _ALGORITHM = "HS256"
 _ACCESS_TOKEN_EXPIRE_MINUTES = 60
-_SECRET_KEY = os.environ.get("SM_SECRET_KEY", None)
 
 
 oauth2_scheme = OAuth2PasswordBearer(
@@ -95,19 +96,25 @@ def create_access_token(data: dict, expired_delta: timedelta | None = None):
     )
     to_encode.update({"exp": expire})
     to_encode.update({"scopes": data.get("scopes", "")})
-    if _SECRET_KEY is None:
-        msg = "SM_SECRET_KEY environment variable not set, cannot create access token"
+
+    return jwt.encode(to_encode, get_key(), algorithm=_ALGORITHM)
+
+
+@cache
+def get_key():
+    """Get the secret key from environment variable."""
+    key = os.getenv("SM_SECRET_KEY")
+    if key is None:
+        msg = "SM_SECRET_KEY environment variable not set"
+        sm_logger.critical(msg)
         raise RuntimeError(msg)
-    return jwt.encode(to_encode, _SECRET_KEY, algorithm=_ALGORITHM)
+    return key
 
 
 def verify_token(token: str, credentials_exception: HTTPException):
     """verify a JWT token and return the payload"""
     try:
-        if _SECRET_KEY is None:
-            msg = "SM_SECRET_KEY environment variable not set, cannot verify access token"
-            raise RuntimeError(msg)
-        payload = jwt.decode(token, _SECRET_KEY, algorithms=[_ALGORITHM])
+        payload = jwt.decode(token, get_key(), algorithms=[_ALGORITHM])
         username: str = payload.get("sub")
         if username is None:
             raise credentials_exception

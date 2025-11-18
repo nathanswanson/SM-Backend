@@ -36,6 +36,7 @@ def app_instance() -> Generator[FastAPI, Any, Any]:
         "SM_LOG_LEVEL": "DEBUG",
         "SM_LOG_PATH": "./sm-log.log",
         "SM_MOUNT_PATH": "./sm-data",
+        "SM_SECRET_KEY": "testsecretkey",
     }
     monkeypatch = pytest.MonkeyPatch()
     original_env = {var: os.environ.get(var) for var in vars_to_purge}
