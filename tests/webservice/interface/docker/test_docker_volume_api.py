@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from server_manager.webservice.docker_interface.docker_volume_api import (
+from server_manager.webservice.interface.docker.docker_volume_api import (
     DockerError,
     docker_delete_file,
     docker_file_upload,
@@ -21,7 +21,7 @@ def _patch_container_ctx(mocker, container):
     async def _ctx(_name):
         yield container
 
-    mocker.patch("server_manager.webservice.docker_interface.docker_volume_api.docker_container", _ctx)
+    mocker.patch("server_manager.webservice.interface.docker.docker_volume_api.docker_container", _ctx)
 
 
 class _DummyExec:

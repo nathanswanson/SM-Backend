@@ -19,14 +19,14 @@ from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm, Se
 
 from server_manager.webservice.db_models import Users, UsersCreate
 from server_manager.webservice.logger import sm_logger
-from server_manager.webservice.models import Token, TokenData
+from server_manager.webservice.models import Token, TokenData, TokenPair
 from server_manager.webservice.util.data_access import DB
 
 load_dotenv()
 
 _ALGORITHM = "HS256"
 _ACCESS_TOKEN_EXPIRE_MINUTES = 60
-
+_REFRESH_TOKEN_DAYS = 30
 
 oauth2_scheme = OAuth2PasswordBearer(
     tokenUrl="users/token", scopes={"management.me": "Read information about the current user"}
@@ -66,8 +66,6 @@ def verify_password(plain_password: str, hashed_password: str):
 
 def get_password_hash(password: str):
     """hash a password for storing"""
-    # Create a fresh salt for each password hash. This is done lazily
-    # so bcrypt.gensalt() is only called when a password needs hashing.
     salt = bcrypt.gensalt()
     return bcrypt.hashpw(password.encode(), salt).decode()
 
@@ -97,6 +95,16 @@ def create_access_token(data: dict, expired_delta: timedelta | None = None):
     to_encode.update({"exp": expire})
     to_encode.update({"scopes": data.get("scopes", "")})
 
+    return jwt.encode(to_encode, get_key(), algorithm=_ALGORITHM)
+
+
+def create_refresh_token(data: dict, expired_delta: timedelta | None = None):
+    """create a JWT refresh token"""
+    to_encode = data.copy()
+    expire = (
+        datetime.now(UTC) + expired_delta if expired_delta else datetime.now(UTC) + timedelta(days=_REFRESH_TOKEN_DAYS)
+    )
+    to_encode.update({"exp": expire})
     return jwt.encode(to_encode, get_key(), algorithm=_ALGORITHM)
 
 
@@ -144,7 +152,7 @@ async def auth_get_user(security_scopes: SecurityScopes, token: Annotated[str, D
         scope = payload.get("scopes", "")
 
         token_scopes = scope
-        token_data = TokenData(scopes=token_scopes, username=payload.get("sub"))
+        token_data = TokenData(scopes=token_scopes, expires_at=payload.get("exp"), username=payload.get("sub"))
     except Exception:  # noqa: BLE001
         raise credentials_exception  # noqa: B904
 
@@ -168,7 +176,50 @@ async def auth_get_active_user(current_user: Annotated[Users, Security(auth_get_
     return current_user
 
 
-async def auth_aquire_access_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> Token:
+def create_tokens_for_user(user: Users) -> TokenPair:
+    """create access and refresh tokens for a given user"""
+    access_token_expire = timedelta(minutes=_ACCESS_TOKEN_EXPIRE_MINUTES)
+    access_token = create_access_token(
+        data={"sub": user.username, "scopes": user.scopes}, expired_delta=access_token_expire
+    )
+    refresh_token = create_refresh_token(data={"sub": user.username}, expired_delta=timedelta(days=_REFRESH_TOKEN_DAYS))
+
+    return TokenPair(
+        access_token=Token(
+            token=access_token,
+            token_type="bearer",  # noqa: S106 is not hardcoded secret
+            expires_in=access_token_expire.seconds,
+        ),
+        refresh_token=Token(
+            token=refresh_token,
+            token_type="bearer",  # noqa: S106 is not hardcoded secret
+            expires_in=_REFRESH_TOKEN_DAYS * 24 * 60 * 60,
+        ),
+    )
+
+
+async def auth_renew_token(refresh_token: str):
+    """return a new access/refresh token using a existing refresh token"""
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Could not validate refresh token",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = verify_token(refresh_token, credentials_exception=credentials_exception)
+        username: str = payload.get("sub")
+
+    except Exception:  # noqa: BLE001
+        raise credentials_exception  # noqa: B904
+
+    user = DB().lookup_username(username)
+    if user is None:
+        raise credentials_exception
+
+    return create_tokens_for_user(user)
+
+
+async def auth_aquire_token(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> TokenPair:
     """authenticate user and return access token"""
     user = auth_user(form_data.username, form_data.password)
     if not user:
@@ -177,8 +228,4 @@ async def auth_aquire_access_token(form_data: Annotated[OAuth2PasswordRequestFor
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    access_token_expire = timedelta(minutes=_ACCESS_TOKEN_EXPIRE_MINUTES)
-    access_token = create_access_token(
-        data={"sub": user.username, "scopes": user.scopes}, expired_delta=access_token_expire
-    )
-    return Token(access_token=access_token, token_type="bearer", expire_time=access_token_expire.seconds)  # noqa: S106, not a password
+    return create_tokens_for_user(user)

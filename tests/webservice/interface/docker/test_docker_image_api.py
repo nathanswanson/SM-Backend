@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 from aiodocker import DockerError
 
-from server_manager.webservice.docker_interface import docker_image_api
+from server_manager.webservice.interface.docker import docker_image_api
 
 
 def _patch_docker_client(mocker, client):
@@ -12,7 +12,7 @@ def _patch_docker_client(mocker, client):
     async def _ctx():
         yield client
 
-    mocker.patch("server_manager.webservice.docker_interface.docker_image_api.docker_client", _ctx)
+    mocker.patch("server_manager.webservice.interface.docker.docker_image_api.docker_client", _ctx)
 
 
 class DummyImages:

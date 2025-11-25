@@ -27,6 +27,9 @@ dependencies = [
     "strawberry-graphql[fastapi]",
 ]
 
+[project.optional-dependencies]
+kubernetes = ["kubernetes>=34.1.0"]
+
 [project.scripts]
 server_manager = "server_manager.cli:server_manager"
 

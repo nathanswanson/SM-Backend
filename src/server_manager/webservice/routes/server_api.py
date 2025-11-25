@@ -3,7 +3,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 
 from server_manager.webservice.db_models import ServersCreate, ServersRead, Users
-from server_manager.webservice.docker_interface.docker_container_api import (
+from server_manager.webservice.interface.docker.docker_container_api import (
     docker_container_create,
     docker_container_health_status,
     docker_container_remove,

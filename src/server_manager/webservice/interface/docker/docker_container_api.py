@@ -15,14 +15,13 @@ from typing import TYPE_CHECKING, Any, cast
 import aiodocker
 from fastapi import HTTPException
 
-from server_manager.webservice.docker_interface.docker_image_api import docker_get_image_exposed_volumes
+from server_manager.webservice.interface.docker.docker_image_api import docker_get_image_exposed_volumes
+from server_manager.webservice.interface.interface import HealthInfo
 from server_manager.webservice.util.context_provider import docker_client, docker_container
 
 if TYPE_CHECKING:
     from aiodocker.containers import DockerContainer
 
-
-from pydantic import BaseModel, ConfigDict, Field
 
 from server_manager.webservice.logger import sm_logger
 
@@ -75,25 +74,6 @@ async def docker_container_start(name: str) -> bool:
     return False
 
 
-async def docker_exposed_ports(name: str) -> list[int]:
-    """get a list of exposed ports from a container by name"""
-    if name in banned_container_access:
-        raise HTTPException(status_code=403, detail="Access to container denied")
-    async with docker_container(name) as container:
-        if container:
-            info = await container.show()
-            ports = info["NetworkSettings"]["Ports"]
-            exposed_ports: list[int] = []
-            for mappings in ports.values():
-                if mappings:
-                    try:
-                        exposed_ports.append(int(mappings[0]["HostPort"]))
-                    except (ValueError, KeyError, TypeError):
-                        continue
-            return exposed_ports
-        return []
-
-
 async def docker_container_running(name: str) -> bool:
     """check if a container is running by name"""
     if name in banned_container_access:
@@ -120,14 +100,6 @@ async def docker_list_containers_names() -> list[str]:
             for container in containers
             if _extract_common_name(container) not in banned_container_access
         ]
-
-
-async def docker_stop_all_containers() -> None:
-    """stop all containers"""
-    async with docker_client() as client:
-        containers = await client.containers.list()
-        for container in containers:
-            await container.stop()
 
 
 async def map_image_volumes(image_name: str, container_name: str) -> list[str]:
@@ -192,15 +164,6 @@ async def docker_container_create(
             return False
         else:
             return True
-
-
-class HealthInfo(BaseModel):
-    model_config = ConfigDict(strict=True)
-
-    start: str = Field(alias="Start")
-    end: str = Field(alias="End")
-    exit_code: int = Field(alias="ExitCode")
-    output: str = Field(alias="Output")
 
 
 async def docker_container_health_status(container_name: str) -> str:

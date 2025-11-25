@@ -6,24 +6,23 @@ Management API for user authentication and account management
 Author: Nathan Swanson
 """
 
-import os
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Security
+from fastapi import APIRouter, Depends, HTTPException, Request, Security
 from fastapi.responses import JSONResponse
 from fastapi.security import OAuth2PasswordRequestForm
 
 from server_manager.webservice.db_models import Users, UsersBase
-from server_manager.webservice.models import CreateUserRequest, Token
+from server_manager.webservice.models import CreateUserRequest
 from server_manager.webservice.util.auth import (
-    auth_aquire_access_token,
+    auth_aquire_token,
     auth_get_active_user,
+    auth_renew_token,
     create_user,
 )
 from server_manager.webservice.util.data_access import DB, get_db
 
 router = APIRouter()
-dev_mode = os.environ.get("SM_ENV") == "DEV"
 
 
 @router.post("/", response_model=UsersBase)
@@ -46,11 +45,41 @@ async def delete_user_account(
     return {"message": "User deleted successfully"}
 
 
-@router.post("/token")
-async def login_user(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]) -> Token:
-    """login user, return access token"""
+@router.post("/refresh")
+async def refresh_token(request: Request):
+    """refresh access token using refresh token"""
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(status_code=401, detail="No refresh token")
+    new_tokens = await auth_renew_token(refresh_token)  # set new access token in cookie
+    response = JSONResponse({"access_token": new_tokens.access_token.token})
+    response.set_cookie(
+        key="refresh_token",
+        value=new_tokens.refresh_token.token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=2592000,
+        # path="/",
+    )
+    return response
 
-    return await auth_aquire_access_token(form_data)
+
+@router.post("/token")
+async def login_user(form_data: Annotated[OAuth2PasswordRequestForm, Depends()]):
+    """login user, return access token and set refresh token to cookie"""
+    tokens = await auth_aquire_token(form_data)
+    response = JSONResponse({"access_token": tokens.access_token.token})
+    response.set_cookie(
+        key="refresh_token",
+        value=tokens.refresh_token.token,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        max_age=2592000,
+        # path="/",
+    )
+    return response
 
 
 @router.post("/revoke")
@@ -58,7 +87,10 @@ async def logout_user(current_user: Annotated[Users, Depends(auth_get_active_use
     """logout user, delete access token cookie"""
     # return response with message
     # TODO: implement token revocation
-    return JSONResponse(content={"message": "Logout successful"})
+    response = JSONResponse({"message": "Logout successful"})
+    response.set_cookie("refresh_token", "", max_age=0)
+    response.delete_cookie("refresh_token")
+    return response
 
 
 @router.get("/me", response_model=UsersBase)

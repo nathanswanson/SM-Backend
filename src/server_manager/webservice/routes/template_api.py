@@ -11,7 +11,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 
 from server_manager.webservice.db_models import TemplatesCreate, TemplatesRead
-from server_manager.webservice.docker_interface.docker_image_api import docker_image_exposed_port
+from server_manager.webservice.interface.docker.docker_image_api import docker_image_exposed_port
 from server_manager.webservice.models import (
     TemplateCreateResponse,
     TemplateDeleteResponse,

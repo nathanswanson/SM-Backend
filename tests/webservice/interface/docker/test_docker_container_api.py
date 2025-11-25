@@ -4,7 +4,7 @@ import aiodocker
 import pytest
 from fastapi import HTTPException
 
-from server_manager.webservice.docker_interface import docker_container_api as api
+from server_manager.webservice.interface.docker import docker_container_api as api
 
 
 @pytest.fixture
@@ -32,7 +32,7 @@ async def test_banned_container_access_raises_forbidden():
 async def test_container_name_exists_returns_true(mocker, async_cm_factory):
     container = mocker.MagicMock()
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_container",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_container",
         return_value=async_cm_factory(container),
     )
 
@@ -43,7 +43,7 @@ async def test_container_name_exists_returns_true(mocker, async_cm_factory):
 async def test_container_stop_invokes_stop(mocker, async_cm_factory):
     container = mocker.AsyncMock()
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_container",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_container",
         return_value=async_cm_factory(container),
     )
 
@@ -54,7 +54,7 @@ async def test_container_stop_invokes_stop(mocker, async_cm_factory):
 @pytest.mark.asyncio
 async def test_container_stop_returns_false_when_missing(mocker, async_cm_factory):
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_container",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_container",
         return_value=async_cm_factory(None),
     )
 
@@ -65,16 +65,16 @@ async def test_container_stop_returns_false_when_missing(mocker, async_cm_factor
 async def test_container_remove_stops_when_running(mocker, async_cm_factory):
     container = mocker.AsyncMock()
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_container",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_container",
         return_value=async_cm_factory(container),
     )
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_container_running",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_container_running",
         new_callable=mocker.AsyncMock,
         return_value=True,
     )
     stop_mock = mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_container_stop",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_container_stop",
         new_callable=mocker.AsyncMock,
         return_value=True,
     )
@@ -87,7 +87,7 @@ async def test_container_remove_stops_when_running(mocker, async_cm_factory):
 @pytest.mark.asyncio
 async def test_container_start_returns_false_when_missing(mocker, async_cm_factory):
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_container",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_container",
         return_value=async_cm_factory(None),
     )
 
@@ -95,31 +95,11 @@ async def test_container_start_returns_false_when_missing(mocker, async_cm_facto
 
 
 @pytest.mark.asyncio
-async def test_docker_exposed_ports_parses_valid_entries(mocker, async_cm_factory):
-    container = mocker.AsyncMock()
-    container.show.return_value = {
-        "NetworkSettings": {
-            "Ports": {
-                "80/tcp": [{"HostPort": "8080"}],
-                "invalid": None,
-                "bad": [{"HostPort": "not-int"}],
-            }
-        }
-    }
-    mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_container",
-        return_value=async_cm_factory(container),
-    )
-
-    assert await api.docker_exposed_ports("mc") == [8080]
-
-
-@pytest.mark.asyncio
 async def test_docker_container_running_reads_state(mocker, async_cm_factory):
     container = mocker.AsyncMock()
     container.show.return_value = {"State": {"Running": True}}
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_container",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_container",
         return_value=async_cm_factory(container),
     )
 
@@ -133,7 +113,7 @@ async def test_docker_list_containers_filters_banned(mocker, async_cm_factory):
     client = mocker.MagicMock()
     client.containers.list = mocker.AsyncMock(return_value=[allowed, banned])
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_client",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_client",
         return_value=async_cm_factory(client),
     )
 
@@ -141,27 +121,10 @@ async def test_docker_list_containers_filters_banned(mocker, async_cm_factory):
 
 
 @pytest.mark.asyncio
-async def test_docker_stop_all_containers_stops_each(mocker, async_cm_factory):
-    container_a = mocker.AsyncMock()
-    container_b = mocker.AsyncMock()
-    client = mocker.MagicMock()
-    client.containers.list = mocker.AsyncMock(return_value=[container_a, container_b])
-    mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_client",
-        return_value=async_cm_factory(client),
-    )
-
-    await api.docker_stop_all_containers()
-
-    container_a.stop.assert_awaited_once()
-    container_b.stop.assert_awaited_once()
-
-
-@pytest.mark.asyncio
 async def test_map_image_volumes_returns_mapped_paths(mocker, monkeypatch):
     monkeypatch.setenv("SM_MOUNT_PATH", "/tmp/mount")
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_get_image_exposed_volumes",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_get_image_exposed_volumes",
         new_callable=mocker.AsyncMock,
         return_value=["/data", "/config"],
     )
@@ -174,7 +137,7 @@ async def test_map_image_volumes_returns_mapped_paths(mocker, monkeypatch):
 @pytest.mark.asyncio
 async def test_map_image_volumes_returns_empty_when_none(mocker):
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_get_image_exposed_volumes",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_get_image_exposed_volumes",
         new_callable=mocker.AsyncMock,
         return_value=None,
     )
@@ -184,7 +147,7 @@ async def test_map_image_volumes_returns_empty_when_none(mocker):
 
 def test_get_servers_network_name_reads_subprocess(mocker):
     result = SimpleNamespace(stdout="test_servers\n")
-    mocker.patch("server_manager.webservice.docker_interface.docker_container_api.subprocess.run", return_value=result)
+    mocker.patch("server_manager.webservice.interface.docker.docker_container_api.subprocess.run", return_value=result)
 
     assert api._get_servers_network_name() == "test_servers"
 
@@ -194,16 +157,16 @@ async def test_container_create_builds_config(mocker, async_cm_factory):
     client = mocker.MagicMock()
     client.containers.create = mocker.AsyncMock()
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_client",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_client",
         return_value=async_cm_factory(client),
     )
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.map_image_volumes",
+        "server_manager.webservice.interface.docker.docker_container_api.map_image_volumes",
         new_callable=mocker.AsyncMock,
         return_value=["/tmp/mc:/data"],
     )
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api._get_servers_network_name",
+        "server_manager.webservice.interface.docker.docker_container_api._get_servers_network_name",
         return_value="server_manager_servers",
     )
     mocker.patch("os.makedirs")
@@ -226,16 +189,16 @@ async def test_container_create_returns_false_when_volume_not_writable(mocker, a
     client = mocker.MagicMock()
     client.containers.create = mocker.AsyncMock()
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_client",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_client",
         return_value=async_cm_factory(client),
     )
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.map_image_volumes",
+        "server_manager.webservice.interface.docker.docker_container_api.map_image_volumes",
         new_callable=mocker.AsyncMock,
         return_value=["/tmp/mc:/data"],
     )
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api._get_servers_network_name",
+        "server_manager.webservice.interface.docker.docker_container_api._get_servers_network_name",
         return_value="net",
     )
     mocker.patch("os.makedirs")
@@ -256,16 +219,16 @@ async def test_container_create_handles_docker_error(mocker, async_cm_factory):
     client = mocker.MagicMock()
     client.containers.create = mocker.AsyncMock(side_effect=aiodocker.exceptions.DockerError(500, {"message": "boom"}))
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_client",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_client",
         return_value=async_cm_factory(client),
     )
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.map_image_volumes",
+        "server_manager.webservice.interface.docker.docker_container_api.map_image_volumes",
         new_callable=mocker.AsyncMock,
         return_value=["/tmp/mc:/data"],
     )
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api._get_servers_network_name",
+        "server_manager.webservice.interface.docker.docker_container_api._get_servers_network_name",
         return_value="net",
     )
     mocker.patch("os.makedirs")
@@ -284,7 +247,7 @@ async def test_container_create_handles_docker_error(mocker, async_cm_factory):
 async def test_container_health_status_returns_output(mocker):
     health_info = api.HealthInfo(Start="s", End="e", ExitCode=0, Output="healthy")
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_container_inspect",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_container_inspect",
         new_callable=mocker.AsyncMock,
         return_value=health_info,
     )
@@ -297,7 +260,7 @@ async def test_container_health_status_returns_output(mocker):
 @pytest.mark.asyncio
 async def test_container_inspect_returns_data(mocker, async_cm_factory):
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_container_running",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_container_running",
         new_callable=mocker.AsyncMock,
         return_value=True,
     )
@@ -313,7 +276,7 @@ async def test_container_inspect_returns_data(mocker, async_cm_factory):
         }
     }
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_container",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_container",
         return_value=async_cm_factory(container),
     )
 
@@ -326,7 +289,7 @@ async def test_container_inspect_returns_data(mocker, async_cm_factory):
 @pytest.mark.asyncio
 async def test_container_inspect_raises_when_not_running(mocker):
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_container_running",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_container_running",
         new_callable=mocker.AsyncMock,
         return_value=False,
     )
@@ -340,14 +303,14 @@ async def test_container_inspect_raises_when_not_running(mocker):
 @pytest.mark.asyncio
 async def test_container_inspect_returns_none_without_health(mocker, async_cm_factory):
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_container_running",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_container_running",
         new_callable=mocker.AsyncMock,
         return_value=True,
     )
     container = mocker.AsyncMock()
     container.show.return_value = {"State": {"Health": {"Log": []}}}
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_container",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_container",
         return_value=async_cm_factory(container),
     )
 
@@ -360,7 +323,7 @@ async def test_container_send_command_attaches_socket(mocker, async_cm_factory):
     container = mocker.AsyncMock()
     container.attach.return_value = sock
     mocker.patch(
-        "server_manager.webservice.docker_interface.docker_container_api.docker_container",
+        "server_manager.webservice.interface.docker.docker_container_api.docker_container",
         return_value=async_cm_factory(container),
     )
 

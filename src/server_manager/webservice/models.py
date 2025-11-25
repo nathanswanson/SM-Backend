@@ -106,13 +106,19 @@ class TemplateDeleteResponse(SuccessModel):
 
 
 class Token(BaseModel):
-    access_token: str
+    token: str
     token_type: str
-    expire_time: int | None = None
+    expires_in: int
+
+
+class TokenPair(BaseModel):
+    access_token: Token
+    refresh_token: Token
 
 
 class TokenData(BaseModel):
     username: str
+    expires_at: int
     scopes: list[str] = []
 
 
