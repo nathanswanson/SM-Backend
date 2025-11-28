@@ -124,6 +124,9 @@ def verify_token(token: str, credentials_exception: HTTPException):
     try:
         payload = jwt.decode(token, get_key(), algorithms=[_ALGORITHM])
         username: str = payload.get("sub")
+        exp = payload.get("exp")
+        if exp is None or datetime.fromtimestamp(exp, tz=UTC) < datetime.now(UTC):
+            raise credentials_exception
         if username is None:
             raise credentials_exception
 
@@ -147,14 +150,19 @@ async def auth_get_user(security_scopes: SecurityScopes, token: Annotated[str, D
         detail="Could not validate User",
         headers={"WWW-Authenticate": authenticate_value},
     )
-    try:
-        payload = verify_token(token, credentials_exception=credentials_exception)
-        scope = payload.get("scopes", "")
 
-        token_scopes = scope
-        token_data = TokenData(scopes=token_scopes, expires_at=payload.get("exp"), username=payload.get("sub"))
-    except Exception:  # noqa: BLE001
-        raise credentials_exception  # noqa: B904
+    payload = verify_token(token, credentials_exception=credentials_exception)
+    exp = payload.get("exp")
+    if exp is None or datetime.fromtimestamp(exp, tz=UTC) < datetime.now(UTC):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired",
+            headers={"WWW-Authenticate": authenticate_value},
+        )
+    scope = payload.get("scopes", "")
+
+    token_scopes = scope
+    token_data = TokenData(scopes=token_scopes, expires_at=payload.get("exp"), username=payload.get("sub"))
 
     user = DB().lookup_username(token_data.username)
     if user is None:

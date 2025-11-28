@@ -10,7 +10,7 @@ from fastapi.security import OAuth2PasswordRequestForm, SecurityScopes
 from server_manager.webservice.db_models import Users, UsersRead
 from server_manager.webservice.util.auth import (
     _ALGORITHM,
-    auth_aquire_access_token,
+    auth_aquire_token,
     auth_get_active_user,
     auth_get_user,
     auth_user,
@@ -207,7 +207,7 @@ async def test_auth_get_user_success(monkeypatch, mocker):
     monkeypatch.setattr("server_manager.webservice.util.auth.DB", lambda: mock_db)
     monkeypatch.setattr(
         "server_manager.webservice.util.auth.verify_token",
-        lambda token, credentials_exception: {"sub": "user", "scopes": ["management.me"]},
+        lambda token, credentials_exception: {"sub": "user", "scopes": ["management.me"], "exp": 9999999999},
     )
 
     result = await auth_get_user(SecurityScopes(scopes=["management.me"]), token="token")
@@ -223,7 +223,7 @@ async def test_auth_get_user_missing_scope(monkeypatch, mocker):
     monkeypatch.setattr("server_manager.webservice.util.auth.DB", lambda: mock_db)
     monkeypatch.setattr(
         "server_manager.webservice.util.auth.verify_token",
-        lambda token, credentials_exception: {"sub": "user", "scopes": ["basic"]},
+        lambda token, credentials_exception: {"sub": "user", "scopes": ["basic"], "exp": 9999999999},
     )
 
     with pytest.raises(HTTPException) as exc:
@@ -260,9 +260,9 @@ async def test_auth_aquire_access_token_success(monkeypatch):
     monkeypatch.setattr("server_manager.webservice.util.auth.auth_user", lambda u, p: user)
 
     form = OAuth2PasswordRequestForm(username="user", password="pw", scope="")
-    token = await auth_aquire_access_token(form)
+    token = await auth_aquire_token(form)
 
-    assert token.token_type == "bearer"
+    assert token.access_token.token_type == "bearer"
     assert token.access_token
 
 
@@ -272,4 +272,4 @@ async def test_auth_aquire_access_token_invalid(monkeypatch):
 
     form = OAuth2PasswordRequestForm(username="user", password="pw", scope="")
     with pytest.raises(HTTPException):
-        await auth_aquire_access_token(form)
+        await auth_aquire_token(form)

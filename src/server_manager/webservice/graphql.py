@@ -83,8 +83,6 @@ def try_get(obj: Any, *keys: str | int) -> int:
 async def stats(container_name: str) -> AsyncGenerator[MetricsQL, None]:
     """
     Stream metrics from a container. `Notes`_
-
-    .. _Notes: file://./db_models.py
     """
     if not container_name:
         sm_logger.debug("No container name provided for stats streaming.")

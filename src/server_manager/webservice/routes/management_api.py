@@ -59,7 +59,7 @@ async def refresh_token(request: Request):
         httponly=True,
         secure=True,
         samesite="lax",
-        max_age=2592000,
+        max_age=new_tokens.refresh_token.expires_in,
         # path="/",
     )
     return response
@@ -76,7 +76,7 @@ async def login_user(form_data: Annotated[OAuth2PasswordRequestForm, Depends()])
         httponly=True,
         secure=True,
         samesite="lax",
-        max_age=2592000,
+        max_age=tokens.refresh_token.expires_in,
         # path="/",
     )
     return response

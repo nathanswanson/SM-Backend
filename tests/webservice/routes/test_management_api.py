@@ -8,7 +8,7 @@ Author: Nathan Swanson
 
 from server_manager.webservice.db_models import Users
 from server_manager.webservice.models import Token
-from server_manager.webservice.util.auth import auth_get_active_user
+from server_manager.webservice.util.auth import TokenPair, auth_get_active_user
 from server_manager.webservice.util.data_access import get_db
 
 
@@ -48,9 +48,12 @@ def test_delete_user_account(test_client, mock_db):
 
 def test_login_user(mocker, test_client):
     """Test logging in a user"""
-    mock_token = Token(access_token="testtoken", token_type="bearer")
+    mock_token = TokenPair(
+        access_token=Token(token="testtoken", token_type="bearer", expires_in=9000),
+        refresh_token=Token(token="refreshtoken", token_type="bearer", expires_in=604800),
+    )
 
-    mocker.patch("server_manager.webservice.routes.management_api.auth_aquire_access_token", return_value=mock_token)
+    mocker.patch("server_manager.webservice.routes.management_api.auth_aquire_token", return_value=mock_token)
 
     response = test_client.post(
         "/users/token",
@@ -58,7 +61,8 @@ def test_login_user(mocker, test_client):
     )
 
     assert response.status_code == 200
-    assert response.json() == {"access_token": "testtoken", "token_type": "bearer", "expire_time": None}
+    assert response.cookies.get("refresh_token") == "refreshtoken"
+    assert response.json() == {"access_token": "testtoken"}
 
 
 def test_logout_user(test_client):
