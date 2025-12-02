@@ -3,15 +3,12 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 
 from server_manager.webservice.db_models import ServersCreate, ServersRead, Users
-from server_manager.webservice.interface.docker.docker_container_api import (
+from server_manager.webservice.interface.docker_api.docker_container_api import (
     docker_container_create,
-    docker_container_health_status,
-    docker_container_remove,
-    docker_container_running,
-    docker_container_send_command,
     docker_container_start,
-    docker_container_stop,
 )
+from server_manager.webservice.interface.docker_api.server_router import ServerRouter
+from server_manager.webservice.interface.interface_manager import ControllerContainerInterface, get_client
 from server_manager.webservice.models import (
     ContainerCommandResponse,
     ServerDeleteResponse,
@@ -19,7 +16,6 @@ from server_manager.webservice.models import (
     ServerStatusResponse,
     ServerStopResponse,
 )
-from server_manager.webservice.net.server_router import ServerRouter
 from server_manager.webservice.util.auth import auth_get_active_user
 from server_manager.webservice.util.data_access import DB
 
@@ -57,11 +53,11 @@ async def get_server_info(server_id: int):
 
 
 @router.delete("/{server_id}", response_model=ServerDeleteResponse)
-async def delete_server(server_id: int):
+async def delete_server(server_id: int, client: Annotated[ControllerContainerInterface, Depends(get_client)]):
     """Delete a specific server"""
     server = DB().get_server(server_id)
     if server and server.container_name:
-        await docker_container_remove(server.container_name)
+        await client.remove(server.container_name)
     success = DB().delete_server(server_id)
     if success:
         return {"success": success}
@@ -82,32 +78,34 @@ async def start_server(server_id: int):
 
 
 @router.post("/{server_id}/stop", response_model=ServerStopResponse)
-async def stop_server(server_id: int):
+async def stop_server(server_id: int, client: Annotated[ControllerContainerInterface, Depends(get_client)]):
     """Stop a specific server"""
     server = DB().get_server(server_id)
     if not server:
         return {"success": False, "error": "Server not found"}
-    ret = await docker_container_stop(server.container_name)
+    ret = await client.stop(server.container_name)
     if ret:
         ServerRouter().close_ports(server)
     return {"success": ret}
 
 
 @router.get("/{server_id}/status", response_model=ServerStatusResponse | None)
-async def get_server_status(server_id: int):
+async def get_server_status(server_id: int, client: Annotated[ControllerContainerInterface, Depends(get_client)]):
     """Get the running status of a specific server"""
     server = DB().get_server(server_id)
     if not server:
         return {"running": False}
-    is_running = await docker_container_running(server.container_name)
-    health = await docker_container_health_status(server.container_name) if is_running else None
+    is_running = await client.is_running(server.container_name)
+    health = await client.health_status(server.container_name) if is_running else None
     return ServerStatusResponse(running=is_running, health=health)
 
 
 @router.post("/{server_id}/command", response_model=ContainerCommandResponse)
-async def send_command(server_id: int, command: str):
+async def send_command(
+    server_id: int, command: str, client: Annotated[ControllerContainerInterface, Depends(get_client)]
+):
     server = DB().get_server(server_id)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
-    ret = await docker_container_send_command(server.container_name, command)
+    ret = await client.command(server.container_name, command)
     return ContainerCommandResponse(success=ret)

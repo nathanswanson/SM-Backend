@@ -7,7 +7,7 @@ from http import HTTPStatus
 import requests
 
 from server_manager.webservice.db_models import ServersRead
-from server_manager.webservice.interface.docker.docker_container_api import docker_container_name_exists
+from server_manager.webservice.interface.docker_api.docker_container_api import docker_container_name_exists
 from server_manager.webservice.logger import sm_logger
 from server_manager.webservice.util.data_access import DB
 from server_manager.webservice.util.singleton import SingletonMeta

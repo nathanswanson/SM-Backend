@@ -4,8 +4,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 
 from server_manager.webservice.db_models import Users
-from server_manager.webservice.interface.docker.docker_container_api import docker_container_running
-from server_manager.webservice.interface.docker.docker_volume_api import docker_list_directory
+from server_manager.webservice.interface.docker_api.docker_container_api import docker_container_running
+from server_manager.webservice.interface.docker_api.docker_volume_api import docker_list_directory
 from server_manager.webservice.models import (
     NodeListResponse,
     ServerFileListResponse,

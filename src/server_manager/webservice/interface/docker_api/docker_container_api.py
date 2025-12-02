@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING, Any, cast
 import aiodocker
 from fastapi import HTTPException
 
-from server_manager.webservice.interface.docker.docker_image_api import docker_get_image_exposed_volumes
+from server_manager.webservice.interface.docker_api.docker_image_api import docker_get_image_exposed_volumes
 from server_manager.webservice.interface.interface import HealthInfo
 from server_manager.webservice.util.context_provider import docker_client, docker_container
 
@@ -32,8 +32,6 @@ banned_container_access = ["server-manager", "rproxy", "docker-socket-proxy", "p
 
 async def docker_container_name_exists(name: str) -> bool:
     """check if a container name exists"""
-    if name in banned_container_access:
-        raise HTTPException(status_code=403, detail="Access to container denied")
     async with docker_container(name) as container:
         return container is not None
 
@@ -170,11 +168,11 @@ async def docker_container_health_status(container_name: str) -> str:
     """get the health status of a container"""
     if container_name in banned_container_access:
         raise HTTPException(status_code=403, detail="Access to container denied")
-    health_data = await docker_container_inspect(container_name)
+    health_data = await _docker_container_inspect(container_name)
     return health_data.output if health_data else "Health Check N/A"
 
 
-async def docker_container_inspect(container_name: str) -> HealthInfo | None:
+async def _docker_container_inspect(container_name: str) -> HealthInfo | None:
     """inspect a container"""
     if container_name in banned_container_access:
         raise HTTPException(status_code=403, detail="Access to container denied")

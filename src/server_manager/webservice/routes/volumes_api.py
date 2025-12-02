@@ -9,7 +9,7 @@ from typing import Annotated
 from fastapi import APIRouter, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
-from server_manager.webservice.interface.docker.docker_volume_api import (
+from server_manager.webservice.interface.docker_api.docker_volume_api import (
     docker_delete_file,
     docker_file_upload,
     docker_read_file,

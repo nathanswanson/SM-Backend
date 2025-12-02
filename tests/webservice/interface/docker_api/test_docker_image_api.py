@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 from aiodocker import DockerError
 
-from server_manager.webservice.interface.docker import docker_image_api
+from server_manager.webservice.interface.docker_api import docker_image_api
 
 
 def _patch_docker_client(mocker, client):

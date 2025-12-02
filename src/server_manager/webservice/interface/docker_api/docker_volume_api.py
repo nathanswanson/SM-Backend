@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 
 from aiodocker import DockerError
 
-from server_manager.webservice.interface.docker.docker_container_api import docker_container
+from server_manager.webservice.interface.docker_api.docker_container_api import docker_container
 from server_manager.webservice.logger import logging
 
 if TYPE_CHECKING:

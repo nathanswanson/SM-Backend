@@ -3,13 +3,13 @@
 # SPDX-License-Identifier: MIT
 from __future__ import annotations
 
+import importlib
+
 import click
-import uvicorn
 from rich.console import Console
 
 from server_manager.__about__ import __version__
 from server_manager.webservice.logger import LOG_CONFIG
-from server_manager.webservice.webservice import app
 
 console = Console()
 
@@ -19,4 +19,11 @@ console = Console()
 @click.pass_context
 def server_manager(ctx) -> None:
     if not ctx.invoked_subcommand:
-        uvicorn.run(app, log_config=LOG_CONFIG, host="0.0.0.0", port=8000)  # noqa: S104
+        import uvicorn
+
+        mod = importlib.import_module("server_manager.webservice.webservice")
+        app = mod.app
+        uvicorn.run(app, log_config=LOG_CONFIG, host="0.0.0.0", port=8000)
+
+
+from server_manager.cli.kubernetes_cli import container_if

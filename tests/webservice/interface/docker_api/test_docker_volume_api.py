@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from server_manager.webservice.interface.docker.docker_volume_api import (
+from server_manager.webservice.interface.docker_api.docker_volume_api import (
     DockerError,
     docker_delete_file,
     docker_file_upload,

@@ -46,6 +46,8 @@ config-path = "ruff.toml"
 
 # dev
 [tool.hatch.envs.default]
+dev-mode = true
+features = ["kubernetes"]
 dependencies = [
     "debugpy",
     "pytest",

@@ -1,7 +1,9 @@
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod
 from collections.abc import AsyncGenerator
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from server_manager.webservice.db_models import ServersCreate, TemplatesCreate
 
 type DirList = tuple[list[str], list[str]]
 
@@ -16,96 +18,66 @@ class HealthInfo(BaseModel):
 
 
 class ControllerImageInterface:
-    @staticmethod
     @abstractmethod
-    def image_exposed_port(image_name: str) -> list[int] | None:
+    async def image_exposed_port(self, image_name: str) -> list[int] | None:
         pass
 
-    @staticmethod
     @abstractmethod
-    def image_exposed_volumes(image_name: str) -> list[str] | None:
+    async def image_exposed_volumes(self, image_name: str) -> list[str] | None:
         pass
 
 
 class ControllerVolumeInterface:
-    @staticmethod
     @abstractmethod
-    def list_directory(container_name: str, path: str) -> DirList | None:
+    async def list_directory(self, container_name: str, path: str) -> DirList | None:
         pass
 
-    @staticmethod
     @abstractmethod
-    def read_file(container_name: str, path: str) -> AsyncGenerator:
+    async def read_file(self, container_name: str, path: str) -> AsyncGenerator:
         pass
 
-    @staticmethod
     @abstractmethod
-    def read_archive(container_name: str, path: str) -> AsyncGenerator:
+    async def read_archive(self, container_name: str, path: str) -> AsyncGenerator:
         pass
 
-    @staticmethod
     @abstractmethod
-    def write_file(container_name: str, path: str, data: bytes) -> bool:
+    async def write_file(self, container_name: str, path: str, data: bytes) -> bool:
         pass
 
-    @staticmethod
     @abstractmethod
-    def delete_file(container_name: str, path: str) -> bool:
+    async def delete_file(self, container_name: str, path: str) -> bool:
         pass
 
 
-class ControllerContainerInterface:
-    @staticmethod
+class ControllerContainerInterface(metaclass=ABCMeta):
     @abstractmethod
-    def list_container_names() -> list[dict]:
+    async def create(self, server: ServersCreate, template: TemplatesCreate) -> bool:
         pass
 
-    @staticmethod
     @abstractmethod
-    def get_container(container_name: str) -> dict | None:
+    async def start(self, container_name: str) -> bool:
         pass
 
-    @staticmethod
     @abstractmethod
-    def create_container(container_config: dict) -> dict:
+    async def stop(self, container_name: str) -> bool:
         pass
 
-    @staticmethod
     @abstractmethod
-    def start_container(container_name: str) -> bool:
+    async def remove(self, container_name: str) -> bool:
         pass
 
-    @staticmethod
     @abstractmethod
-    def stop_container(container_name: str) -> bool:
+    async def exists(self, container_name: str) -> bool:
         pass
 
-    @staticmethod
     @abstractmethod
-    def remove_container(container_name: str) -> bool:
+    async def is_running(self, container_name: str) -> bool:
         pass
 
-    @staticmethod
     @abstractmethod
-    def container_name_exists(container_name: str) -> bool:
+    async def health_status(self, container_name: str) -> str | None:
         pass
 
-    @staticmethod
     @abstractmethod
-    def container_running(container_name: str) -> bool:
-        pass
-
-    @staticmethod
-    @abstractmethod
-    def container_health_status(container_name: str) -> str | None:
-        pass
-
-    @staticmethod
-    @abstractmethod
-    def container_inspect(container_name: str) -> dict | None:
-        pass
-
-    @staticmethod
-    @abstractmethod
-    def container_command(container_name: str, command: str) -> bool:
+    async def command(self, container_name: str, command: str) -> bool:
         pass
