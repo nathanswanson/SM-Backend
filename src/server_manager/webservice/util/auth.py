@@ -217,7 +217,7 @@ async def auth_renew_token(refresh_token: str):
         payload = verify_token(refresh_token, credentials_exception=credentials_exception)
         username: str = payload.get("sub")
 
-    except Exception:  # noqa: BLE001
+    except Exception:
         raise credentials_exception  # noqa: B904
 
     user = DB().lookup_username(username)

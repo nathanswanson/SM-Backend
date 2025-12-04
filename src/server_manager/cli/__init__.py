@@ -24,6 +24,3 @@ def server_manager(ctx) -> None:
         mod = importlib.import_module("server_manager.webservice.webservice")
         app = mod.app
         uvicorn.run(app, log_config=LOG_CONFIG, host="0.0.0.0", port=8000)
-
-
-from server_manager.cli.kubernetes_cli import container_if

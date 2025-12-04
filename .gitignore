@@ -2,3 +2,4 @@ dist/
 sm-data/
 __pycache__
 .coverage*
+tools/k8s/overlays/dev/sercrets.env
