@@ -18,7 +18,7 @@ jobs:
               uses: actions/checkout@v6
               with:
                   repository: nathanswanson/SM-Backend
-                  ref: main
+                  ref: kube
 
             - name: Set up QEMU
               uses: docker/setup-qemu-action@v3
