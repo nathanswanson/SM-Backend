@@ -36,9 +36,6 @@ async def create_server(server: ServersCreate, current_user: Annotated[Users, De
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
 
-    # docker_ret = await docker_container_create(server.name, template.image, server.env, server_link=server.name)
-    # if not docker_ret:
-    # raise HTTPException(status_code=500, detail="Failed to create Docker container")
     return DB().create_server(server, port=template.exposed_port, linked_users=[current_user])
 
 
