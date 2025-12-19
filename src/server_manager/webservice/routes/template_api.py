@@ -11,7 +11,6 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 
 from server_manager.webservice.db_models import TemplatesCreate, TemplatesRead
-from server_manager.webservice.interface.docker_api.docker_image_api import docker_image_exposed_port
 from server_manager.webservice.models import (
     TemplateCreateResponse,
     TemplateDeleteResponse,
@@ -25,8 +24,7 @@ router = APIRouter()
 @router.post("/", response_model=TemplateCreateResponse)
 async def add_template(template: TemplatesCreate, db: Annotated[DB, Depends(get_db)]):
     """add a new template"""
-    ports = await docker_image_exposed_port(template.image)
-    ret = db.create_template(template, exposed_port=ports)
+    ret = db.create_template(template)
     return TemplateCreateResponse(success=ret is not None)
 
 
@@ -42,8 +40,7 @@ def get_template(template_id: int, db: Annotated[DB, Depends(get_db)]):
 @router.patch("/{template_id}", response_model=TemplateCreateResponse)
 async def update_template(template_id: int, template: TemplatesCreate, db: Annotated[DB, Depends(get_db)]):
     """update a template by id"""
-    ports = await docker_image_exposed_port(template.image)
-    ret = db.update_template(template_id, template, exposed_port=ports)
+    ret = db.update_template(template_id, template)
     return TemplateCreateResponse(success=ret is not None)
 
 

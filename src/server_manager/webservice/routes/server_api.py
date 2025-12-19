@@ -3,11 +3,11 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 
 from server_manager.webservice.db_models import ServersCreate, ServersRead, Users
-from server_manager.webservice.interface.docker_api.docker_container_api import (
-    docker_container_create,
-    docker_container_start,
-)
-from server_manager.webservice.interface.docker_api.server_router import ServerRouter
+
+# from server_manager.webservice.interface.docker_api.docker_container_api import (
+#     docker_container_start,
+# )
+# from server_manager.webservice.interface.docker_api.server_router import ServerRouter
 from server_manager.webservice.interface.interface_manager import ControllerContainerInterface, get_client
 from server_manager.webservice.models import (
     ContainerCommandResponse,
@@ -36,10 +36,10 @@ async def create_server(server: ServersCreate, current_user: Annotated[Users, De
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
 
-    docker_ret = await docker_container_create(server.name, template.image, server.env, server_link=server.name)
-    if not docker_ret:
-        raise HTTPException(status_code=500, detail="Failed to create Docker container")
-    return DB().create_server(server, port=DB().unused_port(len(template.exposed_port)), linked_users=[current_user])
+    # docker_ret = await docker_container_create(server.name, template.image, server.env, server_link=server.name)
+    # if not docker_ret:
+    # raise HTTPException(status_code=500, detail="Failed to create Docker container")
+    return DB().create_server(server, port=template.exposed_port, linked_users=[current_user])
 
 
 @router.get("/{server_id}", response_model=ServersRead)
@@ -65,15 +65,14 @@ async def delete_server(server_id: int, client: Annotated[ControllerContainerInt
 
 
 @router.post("/{server_id}/start", response_model=ServerStartResponse)
-async def start_server(server_id: int):
+async def start_server(server_id: int, client: Annotated[ControllerContainerInterface, Depends(get_client)]):
     """Start a specific server"""
     # get container name from servers(name)
     server = DB().get_server(server_id)
     if not server:
         return {"success": False, "error": "Server not found"}
-    ret = await docker_container_start(server.container_name)
-    if ret:
-        await ServerRouter().open_ports(server)
+    ret = await client.start(server.container_name)
+
     return {"success": ret}
 
 
@@ -84,8 +83,6 @@ async def stop_server(server_id: int, client: Annotated[ControllerContainerInter
     if not server:
         return {"success": False, "error": "Server not found"}
     ret = await client.stop(server.container_name)
-    if ret:
-        ServerRouter().close_ports(server)
     return {"success": ret}
 
 

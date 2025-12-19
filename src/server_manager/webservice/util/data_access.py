@@ -158,11 +158,10 @@ class DB(metaclass=SingletonMeta):
     def create_template(
         self,
         template: TemplatesCreate,
-        **kwargs,
     ) -> TemplatesRead:
         with Session(self._engine) as session:
             try:
-                mapped_template = Templates.model_validate(template, update=kwargs)
+                mapped_template = Templates.model_validate(template)
                 session.add(mapped_template)
                 session.commit()
                 session.refresh(mapped_template)
@@ -184,12 +183,12 @@ class DB(metaclass=SingletonMeta):
         with Session(self._engine) as session:
             return cast(Sequence[TemplatesRead], session.exec(sqlmodel.select(Templates)).all())
 
-    def update_template(self, template_id: int, template: TemplatesCreate, **kwargs) -> Templates | None:
+    def update_template(self, template_id: int, template: TemplatesCreate) -> Templates | None:
         with Session(self._engine) as session:
             template_obj = session.get(Templates, template_id)
             if template_obj is not None:
                 try:
-                    updated_template = template.model_copy(update=kwargs)
+                    updated_template = template.model_copy()
                     for key, value in updated_template.model_dump().items():
                         setattr(template_obj, key, value)
                     session.add(template_obj)
