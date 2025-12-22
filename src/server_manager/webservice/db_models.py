@@ -156,7 +156,6 @@ class ServersBase(SQLModel):
         sa_column=Column(JSON),
         default=[],
     )
-    linked_users: list[Users] = Relationship(back_populates="linked_servers", link_model=ServerUserLink)
 
 
 class Servers(
@@ -167,6 +166,7 @@ class Servers(
     id: Optional[int] = Field(primary_key=True, default=None, description="Server ID")
     server_node: "Nodes" = Relationship(back_populates="child_servers")
     server_template: "Templates" = Relationship(back_populates="linked_servers")
+    linked_users: list[Users] = Relationship(back_populates="linked_servers", link_model=ServerUserLink)
     port: list[int] = Field(description="List of port exposed by proxy", sa_column=Column(ARRAY(Integer)))
 
 
@@ -179,3 +179,4 @@ class ServersRead(ServersBase):
     node_id: int = Field(foreign_key="nodes.id")
     template_id: int = Field(foreign_key="templates.id")
     port: list[int]
+    linked_users: list[UsersRead] = []
