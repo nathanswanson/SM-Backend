@@ -17,6 +17,7 @@ from fastapi import HTTPException
 from psycopg2.errors import UniqueViolation
 from pydantic import ValidationError
 from sqlalchemy.exc import InvalidRequestError
+from sqlalchemy.orm import selectinload
 from sqlmodel import Session, SQLModel, create_engine, func, select
 
 from server_manager.webservice.db_models import (
@@ -75,13 +76,15 @@ class DB(metaclass=SingletonMeta):
 
     def get_server(self, server_id: int) -> ServersRead | None:
         with Session(self._engine) as session:
-            statement = sqlmodel.select(Servers).where(Servers.id == server_id)
+            statement = (
+                sqlmodel.select(Servers).where(Servers.id == server_id).options(selectinload(Servers.linked_users))  # type: ignore[arg-type]
+            )
             server = session.exec(statement).first()
             return cast(ServersRead | None, server)
 
     def get_server_by_name(self, name: str) -> ServersRead | None:
         with Session(self._engine) as session:
-            statement = sqlmodel.select(Servers).where(Servers.name == name)
+            statement = sqlmodel.select(Servers).where(Servers.name == name).options(selectinload(Servers.linked_users))  # type: ignore[arg-type]
             server = session.exec(statement).first()
             return cast(ServersRead | None, server)
 
