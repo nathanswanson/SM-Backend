@@ -17,7 +17,7 @@ class DockerContainerAPI(ControllerContainerInterface):
         return False
 
     @override
-    async def start(self, container_name: str) -> bool:
+    async def start(self, container_name: str, namespace: str) -> bool:
         if container_name in banned_container_access:
             raise HTTPException(status_code=403, detail="Access to container denied")
         async with docker_container(container_name) as container:
@@ -28,7 +28,7 @@ class DockerContainerAPI(ControllerContainerInterface):
         return False
 
     @override
-    async def stop(self, container_name: str) -> bool:
+    async def stop(self, container_name: str, namespace: str) -> bool:
         if container_name in banned_container_access:
             raise HTTPException(status_code=403, detail="Access to container denied")
         async with docker_container(container_name) as container:
@@ -39,7 +39,7 @@ class DockerContainerAPI(ControllerContainerInterface):
         return False
 
     @override
-    async def is_running(self, container_name: str) -> bool:
+    async def is_running(self, container_name: str, namespace: str) -> bool:
         """check if a container is running by name"""
         if container_name in banned_container_access:
             raise HTTPException(status_code=403, detail="Access to container denied")
@@ -51,17 +51,17 @@ class DockerContainerAPI(ControllerContainerInterface):
         return False
 
     @override
-    async def health_status(self, container_name: str) -> str | None:
+    async def health_status(self, container_name: str, namespace: str) -> str | None:
         if container_name in banned_container_access:
             raise HTTPException(status_code=403, detail="Access to container denied")
-        health_data = await self._docker_container_inspect(container_name)
+        health_data = await self._docker_container_inspect(container_name, namespace)
         return health_data.output if health_data else "Health Check N/A"
 
-    async def _docker_container_inspect(self, container_name: str) -> HealthInfo | None:
+    async def _docker_container_inspect(self, container_name: str, namespace: str) -> HealthInfo | None:
         """inspect a container"""
         if container_name in banned_container_access:
             raise HTTPException(status_code=403, detail="Access to container denied")
-        if not await self.is_running(container_name):
+        if not await self.is_running(container_name, namespace):
             raise HTTPException(status_code=400, detail=f"Container '{container_name}' is not running")
 
         async with docker_container(container_name) as container:
@@ -76,7 +76,7 @@ class DockerContainerAPI(ControllerContainerInterface):
         return None
 
     @override
-    async def command(self, container_name: str, command: str) -> bool:
+    async def command(self, container_name: str, command: str, namespace: str) -> bool:
         """send a command to a container"""
         async with docker_container(container_name) as container:
             # Get the raw socket
@@ -100,7 +100,7 @@ class DockerContainerAPI(ControllerContainerInterface):
         return container._container["Names"][0].strip("/")  # noqa: SLF001
 
     @override
-    async def remove(self, container_name: str) -> bool:
+    async def remove(self, container_name: str, namespace: str) -> bool:
         if container_name in banned_container_access:
             raise HTTPException(status_code=403, detail="Access to container denied")
         async with docker_container(container_name) as container:
@@ -111,7 +111,7 @@ class DockerContainerAPI(ControllerContainerInterface):
         return False
 
     @override
-    async def exists(self, container_name: str) -> bool:
+    async def exists(self, container_name: str, namespace: str) -> bool:
         if container_name in banned_container_access:
             raise HTTPException(status_code=403, detail="Access to container denied")
         async with docker_client() as client:

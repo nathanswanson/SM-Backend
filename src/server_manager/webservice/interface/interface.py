@@ -55,29 +55,29 @@ class ControllerContainerInterface(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    async def start(self, container_name: str) -> bool:
+    async def start(self, container_name: str, namespace: str) -> bool:
         pass
 
     @abstractmethod
-    async def stop(self, container_name: str) -> bool:
+    async def stop(self, container_name: str, namespace: str) -> bool:
         pass
 
     @abstractmethod
-    async def remove(self, container_name: str) -> bool:
+    async def remove(self, container_name: str, namespace: str) -> bool:
         pass
 
     @abstractmethod
-    async def exists(self, container_name: str) -> bool:
+    async def exists(self, container_name: str, namespace: str) -> bool:
         pass
 
     @abstractmethod
-    async def is_running(self, container_name: str) -> bool:
+    async def is_running(self, container_name: str, namespace: str) -> bool:
         pass
 
     @abstractmethod
-    async def health_status(self, container_name: str) -> str | None:
+    async def health_status(self, container_name: str, namespace: str) -> str | None:
         pass
 
     @abstractmethod
-    async def command(self, container_name: str, command: str) -> bool:
+    async def command(self, container_name: str, command: str, namespace: str) -> bool:
         pass

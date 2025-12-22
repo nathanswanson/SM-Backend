@@ -54,7 +54,7 @@ async def delete_server(server_id: int, client: Annotated[ControllerContainerInt
     """Delete a specific server"""
     server = DB().get_server(server_id)
     if server and server.container_name:
-        await client.remove(server.container_name)
+        await client.remove(server.container_name, namespace=f"tenant-{server.linked_users[0].id}")
     success = DB().delete_server(server_id)
     if success:
         return {"success": success}
@@ -68,7 +68,7 @@ async def start_server(server_id: int, client: Annotated[ControllerContainerInte
     server = DB().get_server(server_id)
     if not server:
         return {"success": False, "error": "Server not found"}
-    ret = await client.start(server.container_name)
+    ret = await client.start(server.container_name, namespace=f"tenant-{server.linked_users[0].id}")
 
     return {"success": ret}
 
@@ -79,7 +79,7 @@ async def stop_server(server_id: int, client: Annotated[ControllerContainerInter
     server = DB().get_server(server_id)
     if not server:
         return {"success": False, "error": "Server not found"}
-    ret = await client.stop(server.container_name)
+    ret = await client.stop(server.container_name, namespace=f"tenant-{server.linked_users[0].id}")
     return {"success": ret}
 
 
@@ -89,8 +89,12 @@ async def get_server_status(server_id: int, client: Annotated[ControllerContaine
     server = DB().get_server(server_id)
     if not server:
         return {"running": False}
-    is_running = await client.is_running(server.container_name)
-    health = await client.health_status(server.container_name) if is_running else None
+    is_running = await client.is_running(server.container_name, namespace=f"tenant-{server.linked_users[0].id}")
+    health = (
+        await client.health_status(server.container_name, namespace=f"tenant-{server.linked_users[0].id}")
+        if is_running
+        else None
+    )
     return ServerStatusResponse(running=is_running, health=health)
 
 
@@ -101,5 +105,5 @@ async def send_command(
     server = DB().get_server(server_id)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
-    ret = await client.command(server.container_name, command)
+    ret = await client.command(server.container_name, command, namespace=f"tenant-{server.linked_users[0].id}")
     return ContainerCommandResponse(success=ret)
