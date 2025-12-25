@@ -1,29 +1,28 @@
-FROM python:3.12 AS installer
+FROM --platform=$BUILDPLATFORM python:3.12 AS installer
 
 WORKDIR /app
 
 
-COPY . .
+# COPY . .
+COPY src/ /app/src/
+COPY pyproject.toml /app/
+COPY README.md /app/
 
+# COPY . . 
 RUN python -m pip install build
 RUN python -m build --wheel
 
 RUN echo $(ls /app/dist/)
-FROM ubuntu:questing
+FROM python:3.12-slim
 
 WORKDIR /app
 
 # backend
 COPY --from=installer /app/dist/server_manager*.whl /app/
-
-RUN apt-get update && \
-    apt-get install -y unzip pipx && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
-
-RUN pipx install server_manager*.whl && rm server_manager*.whl
+RUN pip install build
+RUN WHL=$(ls server_manager*.whl) && pip install "${WHL}[kubernetes]" && rm "$WHL"
 
 EXPOSE 8000
 
 VOLUME [ "/data"]
-ENTRYPOINT [ "/root/.local/bin/server_manager" ]
+ENTRYPOINT [ "/usr/local/bin/server_manager" ]

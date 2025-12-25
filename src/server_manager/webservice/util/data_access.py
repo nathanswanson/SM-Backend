@@ -72,6 +72,10 @@ class DB(metaclass=SingletonMeta):
             session.add(db_server)
             session.commit()
             session.refresh(db_server)
+            statement = (
+                sqlmodel.select(Servers).where(Servers.id == db_server.id).options(selectinload(Servers.linked_users))  # type: ignore[arg-type]
+            )
+            db_server = session.exec(statement).one()
             return cast(ServersRead, db_server)
 
     def get_server(self, server_id: int) -> ServersRead | None:

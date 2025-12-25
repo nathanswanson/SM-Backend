@@ -4,11 +4,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from server_manager.webservice.db_models import ServersCreate, ServersRead, Users
 
-# from server_manager.webservice.interface.docker_api.docker_container_api import (
-#     docker_container_start,
-# )
 # from server_manager.webservice.interface.docker_api.server_router import ServerRouter
-from server_manager.webservice.interface.interface_manager import ControllerContainerInterface, get_client
+from server_manager.webservice.interface.interface_manager import ControllerContainerInterface, get_container_client
 from server_manager.webservice.models import (
     ContainerCommandResponse,
     ServerDeleteResponse,
@@ -23,7 +20,11 @@ router = APIRouter()
 
 
 @router.post("/", response_model=ServersRead)
-async def create_server(server: ServersCreate, current_user: Annotated[Users, Depends(auth_get_active_user)]):
+async def create_server(
+    server: ServersCreate,
+    current_user: Annotated[Users, Depends(auth_get_active_user)],
+    client: Annotated[ControllerContainerInterface, Depends(get_container_client)],
+):
     """Create a new server"""
     # create container of Servers.name name
     # start with template then override with server data if present
@@ -35,7 +36,7 @@ async def create_server(server: ServersCreate, current_user: Annotated[Users, De
         raise HTTPException(status_code=400, detail="Server with that name already exists")
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
-
+    await client.create(server, template)
     return DB().create_server(server, port=template.exposed_port, linked_users=[current_user])
 
 
@@ -50,7 +51,7 @@ async def get_server_info(server_id: int):
 
 
 @router.delete("/{server_id}", response_model=ServerDeleteResponse)
-async def delete_server(server_id: int, client: Annotated[ControllerContainerInterface, Depends(get_client)]):
+async def delete_server(server_id: int, client: Annotated[ControllerContainerInterface, Depends(get_container_client)]):
     """Delete a specific server"""
     server = DB().get_server(server_id)
     if server and server.container_name:
@@ -62,7 +63,7 @@ async def delete_server(server_id: int, client: Annotated[ControllerContainerInt
 
 
 @router.post("/{server_id}/start", response_model=ServerStartResponse)
-async def start_server(server_id: int, client: Annotated[ControllerContainerInterface, Depends(get_client)]):
+async def start_server(server_id: int, client: Annotated[ControllerContainerInterface, Depends(get_container_client)]):
     """Start a specific server"""
     # get container name from servers(name)
     server = DB().get_server(server_id)
@@ -74,7 +75,7 @@ async def start_server(server_id: int, client: Annotated[ControllerContainerInte
 
 
 @router.post("/{server_id}/stop", response_model=ServerStopResponse)
-async def stop_server(server_id: int, client: Annotated[ControllerContainerInterface, Depends(get_client)]):
+async def stop_server(server_id: int, client: Annotated[ControllerContainerInterface, Depends(get_container_client)]):
     """Stop a specific server"""
     server = DB().get_server(server_id)
     if not server:
@@ -84,7 +85,9 @@ async def stop_server(server_id: int, client: Annotated[ControllerContainerInter
 
 
 @router.get("/{server_id}/status", response_model=ServerStatusResponse | None)
-async def get_server_status(server_id: int, client: Annotated[ControllerContainerInterface, Depends(get_client)]):
+async def get_server_status(
+    server_id: int, client: Annotated[ControllerContainerInterface, Depends(get_container_client)]
+):
     """Get the running status of a specific server"""
     server = DB().get_server(server_id)
     if not server:
@@ -100,7 +103,7 @@ async def get_server_status(server_id: int, client: Annotated[ControllerContaine
 
 @router.post("/{server_id}/command", response_model=ContainerCommandResponse)
 async def send_command(
-    server_id: int, command: str, client: Annotated[ControllerContainerInterface, Depends(get_client)]
+    server_id: int, command: str, client: Annotated[ControllerContainerInterface, Depends(get_container_client)]
 ):
     server = DB().get_server(server_id)
     if not server:

@@ -3,7 +3,7 @@ from collections.abc import AsyncGenerator
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from server_manager.webservice.db_models import ServersCreate, TemplatesCreate
+from server_manager.webservice.db_models import ServersCreate, Templates
 
 type DirList = tuple[list[str], list[str]]
 
@@ -29,29 +29,29 @@ class ControllerImageInterface:
 
 class ControllerVolumeInterface:
     @abstractmethod
-    async def list_directory(self, container_name: str, path: str) -> DirList | None:
+    async def list_directory(self, container_name: str, namespace: str, path: str) -> DirList | None:
         pass
 
     @abstractmethod
-    async def read_file(self, container_name: str, path: str) -> AsyncGenerator:
+    async def read_file(self, container_name: str, namespace: str, path: str) -> AsyncGenerator:
         pass
 
     @abstractmethod
-    async def read_archive(self, container_name: str, path: str) -> AsyncGenerator:
+    async def read_archive(self, container_name: str, namespace: str, path: str) -> AsyncGenerator:
         pass
 
     @abstractmethod
-    async def write_file(self, container_name: str, path: str, data: bytes) -> bool:
+    async def write_file(self, container_name: str, namespace: str, path: str, data: bytes) -> bool:
         pass
 
     @abstractmethod
-    async def delete_file(self, container_name: str, path: str) -> bool:
+    async def delete_file(self, container_name: str, namespace: str, path: str) -> bool:
         pass
 
 
 class ControllerContainerInterface(metaclass=ABCMeta):
     @abstractmethod
-    async def create(self, server: ServersCreate, template: TemplatesCreate) -> bool:
+    async def create(self, server: ServersCreate, template: Templates) -> bool:
         pass
 
     @abstractmethod

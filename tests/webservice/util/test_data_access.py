@@ -23,9 +23,9 @@ class _SessionContext:
 
 @pytest.fixture(autouse=True)
 def reset_singleton():
-    SingletonMeta._instances.pop(DB, None)  # noqa: SLF001 - reset singleton state for tests
+    SingletonMeta._instances.pop(DB, None)
     yield
-    SingletonMeta._instances.pop(DB, None)  # noqa: SLF001 - cleanup after tests
+    SingletonMeta._instances.pop(DB, None)
 
 
 @pytest.fixture
@@ -208,7 +208,8 @@ def _template_validation_error() -> ValidationError:
         )
     except ValidationError as exc:
         return exc
-    raise AssertionError("Expected TemplatesCreate validation to fail")
+    msg = "Expected TemplatesCreate validation to fail"
+    raise AssertionError(msg)
 
 
 def test_create_server_returns_refreshed_instance(db_with_session):
@@ -271,11 +272,11 @@ def test_delete_user_branching(db_with_session):
 def test_create_template_handles_unique_violation(db_with_session, mocker, monkeypatch):
     db, session, *_ = db_with_session
 
-    class DummyUniqueViolation(Exception):
+    class DummyUniqueError(Exception):
         pass
 
-    monkeypatch.setattr("server_manager.webservice.util.data_access.UniqueViolation", DummyUniqueViolation)
-    session.add.side_effect = IntegrityError("", {}, DummyUniqueViolation())
+    monkeypatch.setattr("server_manager.webservice.util.data_access.UniqueViolation", DummyUniqueError)
+    session.add.side_effect = IntegrityError("", {}, DummyUniqueError())
 
     with pytest.raises(HTTPException) as exc:
         db.create_template(_sample_template_payload())

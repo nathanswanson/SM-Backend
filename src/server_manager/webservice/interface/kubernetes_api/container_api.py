@@ -1,11 +1,10 @@
 from typing import Any, cast, override
 
-from kubernetes import client
+from kubernetes import client, config
 from kubernetes.client.exceptions import ApiException
-from kubernetes.client.models import V1Deployment
 from kubernetes.stream import stream
 
-from server_manager.webservice.db_models import ServersCreate, TemplatesCreate
+from server_manager.webservice.db_models import ServersCreate, Templates
 from server_manager.webservice.interface.interface import ControllerContainerInterface
 from server_manager.webservice.logger import sm_logger
 
@@ -23,6 +22,21 @@ HTTP_NOT_FOUND = 404
 
 class KubernetesContainerAPI(ControllerContainerInterface):
     """Kubernetes-based container management using Custom Resource Definitions (GameServer CRD)."""
+
+    def __init__(self):
+        """Initialize the Kubernetes client configuration."""
+        try:
+            # Try in-cluster config first (when running inside a pod)
+            config.load_incluster_config()
+            sm_logger.info("Loaded in-cluster Kubernetes configuration")
+        except config.ConfigException:
+            try:
+                # Fall back to kubeconfig (local development)
+                config.load_kube_config()
+                sm_logger.info("Loaded kubeconfig Kubernetes configuration")
+            except config.ConfigException as e:
+                sm_logger.error(f"Failed to load Kubernetes configuration: {e}")
+                raise
 
     def _get_custom_objects_api(self) -> client.CustomObjectsApi:
         """Get the CustomObjectsApi client for CRD operations."""
@@ -53,20 +67,6 @@ class KubernetesContainerAPI(ControllerContainerInterface):
             )
             return True
         except ApiException as e:
-            if e.status == HTTP_NOT_FOUND:
-                # Fall back to deployment-based approach
-                try:
-                    apps_api = self._get_apps_api()
-                    body = {"spec": {"replicas": 1}}
-                    apps_api.patch_namespaced_deployment_scale(
-                        namespace=namespace or DEFAULT_NAMESPACE,
-                        name=container_name,
-                        body=body,
-                    )
-                    return True
-                except ApiException as deploy_err:
-                    sm_logger.error(f"Failed to start deployment {container_name}: {deploy_err}")
-                    return False
             sm_logger.error(f"Failed to start GameServer {container_name}: {e}")
             return False
 
@@ -87,20 +87,6 @@ class KubernetesContainerAPI(ControllerContainerInterface):
             )
             return True
         except ApiException as e:
-            if e.status == HTTP_NOT_FOUND:
-                # Fall back to deployment-based approach
-                try:
-                    apps_api = self._get_apps_api()
-                    body = {"spec": {"replicas": 0}}
-                    apps_api.patch_namespaced_deployment_scale(
-                        namespace=namespace or DEFAULT_NAMESPACE,
-                        name=container_name,
-                        body=body,
-                    )
-                    return True
-                except ApiException as deploy_err:
-                    sm_logger.error(f"Failed to stop deployment {container_name}: {deploy_err}")
-                    return False
             sm_logger.error(f"Failed to stop GameServer {container_name}: {e}")
             return False
 
@@ -118,20 +104,7 @@ class KubernetesContainerAPI(ControllerContainerInterface):
                 name=container_name,
             )
             return True
-        except ApiException as e:
-            if e.status == HTTP_NOT_FOUND:
-                # Fall back to deployment-based approach
-                try:
-                    apps_api = self._get_apps_api()
-                    apps_api.delete_namespaced_deployment(
-                        name=container_name,
-                        namespace=namespace or DEFAULT_NAMESPACE,
-                    )
-                    return True
-                except ApiException as deploy_err:
-                    sm_logger.error(f"Failed to remove deployment {container_name}: {deploy_err}")
-                    return False
-            sm_logger.error(f"Failed to remove GameServer {container_name}: {e}")
+        except ApiException:
             return False
 
     @override
@@ -148,18 +121,7 @@ class KubernetesContainerAPI(ControllerContainerInterface):
                 name=container_name,
             )
             return True
-        except ApiException as e:
-            if e.status == HTTP_NOT_FOUND:
-                # Fall back to deployment-based approach
-                try:
-                    apps_api = self._get_apps_api()
-                    apps_api.read_namespaced_deployment(
-                        name=container_name,
-                        namespace=namespace or DEFAULT_NAMESPACE,
-                    )
-                    return True
-                except ApiException:
-                    return False
+        except ApiException:
             return False
 
     # apiVersion: apiextensions.k8s.io/v1
@@ -299,7 +261,7 @@ class KubernetesContainerAPI(ControllerContainerInterface):
     #       - gs
 
     @override
-    async def create(self, server: ServersCreate, template: TemplatesCreate) -> bool:
+    async def create(self, server: ServersCreate, template: Templates) -> bool:
         """Create a new GameServer custom resource from server and template configuration."""
         try:
             custom_api = self._get_custom_objects_api()
@@ -368,24 +330,7 @@ class KubernetesContainerAPI(ControllerContainerInterface):
             status = gameserver_dict.get("status", {})
             phase = status.get("phase", "")
             return phase == "Running"
-        except ApiException as e:
-            if e.status == HTTP_NOT_FOUND:
-                # Fall back to deployment-based approach
-                try:
-                    apps_api = self._get_apps_api()
-                    deployment = cast(
-                        V1Deployment,
-                        apps_api.read_namespaced_deployment(
-                            name=container_name,
-                            namespace=namespace or DEFAULT_NAMESPACE,
-                        ),
-                    )
-                    # Check if deployment has available replicas
-                    if deployment.status:
-                        return (deployment.status.available_replicas or 0) > 0
-                    return False
-                except ApiException:
-                    return False
+        except ApiException:
             return False
 
     @override

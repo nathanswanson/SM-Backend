@@ -9,6 +9,7 @@ from server_manager.webservice.logger import sm_logger
 
 
 def startup_info():
+    sm_logger.info("Performing environment checks...")
     sm_logger.log_group(
         "Starting server-manager webservice",
         [

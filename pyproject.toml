@@ -25,6 +25,7 @@ dependencies = [
     "colorama",
     "requests",
     "strawberry-graphql[fastapi]",
+    "fabric",
 ]
 
 [project.optional-dependencies]
