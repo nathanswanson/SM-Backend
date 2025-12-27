@@ -261,7 +261,7 @@ class KubernetesContainerAPI(ControllerContainerInterface):
     #       - gs
 
     @override
-    async def create(self, server: ServersCreate, template: Templates) -> bool:
+    async def create(self, server: ServersCreate, template: Templates, tenant_id: int) -> bool:
         """Create a new GameServer custom resource from server and template configuration."""
         try:
             custom_api = self._get_custom_objects_api()
@@ -284,7 +284,7 @@ class KubernetesContainerAPI(ControllerContainerInterface):
                     "templateImage": template.image,
                     "templateName": template.name,
                     "nodeName": str(server.node_id) if server.node_id else None,
-                    "tenantId": server.node_id,  # Using node_id as tenant association
+                    "tenantId": tenant_id,  # Using users[0] as tenant association
                     "tenantName": server.name,
                     "env": server.env or {},
                     "cpu": server.cpu or template.resource_min_cpu or 1,
@@ -396,7 +396,7 @@ class KubernetesContainerAPI(ControllerContainerInterface):
 
     @override
     async def command(self, container_name: str, command: str, namespace: str) -> bool:
-        """Execute a command inside the game server container."""
+        """Send a command to the main process stdin inside the game server container."""
         try:
             core_api = self._get_core_api()
 
@@ -412,23 +412,26 @@ class KubernetesContainerAPI(ControllerContainerInterface):
 
             pod = pods.items[0]
             pod_name = pod.metadata.name
-
-            # Execute command in the pod
-            exec_command = ["/bin/sh", "-c", command]
-
-            # Use kubernetes stream to execute the command
+            sm_logger.debug(f"Found pod {pod_name} for game server {container_name}")
+            sm_logger.debug(f"Executing command on {container_name}: {command}")
+            # Attach to the main process and write command to stdin
             resp = stream(
-                core_api.connect_get_namespaced_pod_exec,
+                core_api.connect_get_namespaced_pod_attach,
                 pod_name,
                 namespace or DEFAULT_NAMESPACE,
-                command=exec_command,
-                stderr=True,
-                stdin=False,
-                stdout=True,
+                container=container_name,
+                stderr=False,
+                stdin=True,
+                stdout=False,
                 tty=False,
+                _preload_content=False,
             )
 
-            sm_logger.debug(f"Command output for {container_name}: {resp}")
+            # Write command to stdin (add newline to execute)
+            resp.write_stdin(command + "\n")
+            resp.close()
+
+            sm_logger.debug(f"Sent command to {container_name}: {command}")
             return True
         except ApiException as e:
             sm_logger.error(f"Failed to execute command on {container_name}: {e}")

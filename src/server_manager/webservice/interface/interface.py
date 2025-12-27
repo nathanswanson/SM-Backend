@@ -4,6 +4,7 @@ from collections.abc import AsyncGenerator
 from pydantic import BaseModel, ConfigDict, Field
 
 from server_manager.webservice.db_models import ServersCreate, Templates
+from server_manager.webservice.models import Metrics
 
 type DirList = tuple[list[str], list[str]]
 
@@ -51,7 +52,7 @@ class ControllerVolumeInterface:
 
 class ControllerContainerInterface(metaclass=ABCMeta):
     @abstractmethod
-    async def create(self, server: ServersCreate, template: Templates) -> bool:
+    async def create(self, server: ServersCreate, template: Templates, tenant_id: int) -> bool:
         pass
 
     @abstractmethod
@@ -81,3 +82,37 @@ class ControllerContainerInterface(metaclass=ABCMeta):
     @abstractmethod
     async def command(self, container_name: str, command: str, namespace: str) -> bool:
         pass
+
+
+class ControllerStreamingInterface(metaclass=ABCMeta):
+    """Interface for streaming logs and metrics from containers."""
+
+    @abstractmethod
+    def stream_logs(
+        self, container_name: str, namespace: str, tail: int = 100, follow: bool = True
+    ) -> AsyncGenerator[str, None]:
+        """Stream logs from a container.
+
+        Args:
+            container_name: Name of the container/pod
+            namespace: Namespace of the container
+            tail: Number of historical lines to fetch
+            follow: Whether to follow new logs
+
+        Yields:
+            Log lines as strings
+        """
+        ...
+
+    @abstractmethod
+    def stream_metrics(self, container_name: str, namespace: str) -> AsyncGenerator[Metrics, None]:
+        """Stream metrics from a container.
+
+        Args:
+            container_name: Name of the container/pod
+            namespace: Namespace of the container
+
+        Yields:
+            Metrics objects with cpu, memory, disk, network stats
+        """
+        ...

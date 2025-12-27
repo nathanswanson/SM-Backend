@@ -15,7 +15,7 @@ from server_manager.webservice.models import (
 )
 from server_manager.webservice.util.auth import auth_get_active_user
 from server_manager.webservice.util.data_access import DB
-
+from server_manager.webservice.logger import sm_logger
 router = APIRouter()
 
 
@@ -36,7 +36,9 @@ async def create_server(
         raise HTTPException(status_code=400, detail="Server with that name already exists")
     if not template:
         raise HTTPException(status_code=404, detail="Template not found")
-    await client.create(server, template)
+    if not current_user.id:
+        raise HTTPException(status_code=400, detail="Invalid user")
+    await client.create(server, template, tenant_id=current_user.id)
     return DB().create_server(server, port=template.exposed_port, linked_users=[current_user])
 
 
@@ -55,7 +57,7 @@ async def delete_server(server_id: int, client: Annotated[ControllerContainerInt
     """Delete a specific server"""
     server = DB().get_server(server_id)
     if server and server.container_name:
-        await client.remove(server.container_name, namespace=f"tenant-{server.linked_users[0].id}")
+        await client.remove(server.container_name, namespace="game-servers")
     success = DB().delete_server(server_id)
     if success:
         return {"success": success}
@@ -69,7 +71,7 @@ async def start_server(server_id: int, client: Annotated[ControllerContainerInte
     server = DB().get_server(server_id)
     if not server:
         return {"success": False, "error": "Server not found"}
-    ret = await client.start(server.container_name, namespace=f"tenant-{server.linked_users[0].id}")
+    ret = await client.start(server.container_name, namespace="game-servers")
 
     return {"success": ret}
 
@@ -77,10 +79,12 @@ async def start_server(server_id: int, client: Annotated[ControllerContainerInte
 @router.post("/{server_id}/stop", response_model=ServerStopResponse)
 async def stop_server(server_id: int, client: Annotated[ControllerContainerInterface, Depends(get_container_client)]):
     """Stop a specific server"""
+
     server = DB().get_server(server_id)
     if not server:
         return {"success": False, "error": "Server not found"}
-    ret = await client.stop(server.container_name, namespace=f"tenant-{server.linked_users[0].id}")
+
+    ret = await client.stop(server.container_name, namespace="game-servers")
     return {"success": ret}
 
 
@@ -92,9 +96,9 @@ async def get_server_status(
     server = DB().get_server(server_id)
     if not server:
         return {"running": False}
-    is_running = await client.is_running(server.container_name, namespace=f"tenant-{server.linked_users[0].id}")
+    is_running = await client.is_running(server.container_name, namespace="game-servers")
     health = (
-        await client.health_status(server.container_name, namespace=f"tenant-{server.linked_users[0].id}")
+        await client.health_status(server.container_name, namespace="game-servers")
         if is_running
         else None
     )
@@ -108,5 +112,7 @@ async def send_command(
     server = DB().get_server(server_id)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
+    sm_logger.debug(f"Sending command to server {server_id}: {command}, id: {server.linked_users[0].id}")
+    
     ret = await client.command(server.container_name, command, namespace=f"tenant-{server.linked_users[0].id}")
     return ContainerCommandResponse(success=ret)
