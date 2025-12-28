@@ -7,7 +7,7 @@ from kubernetes.stream import stream
 from server_manager.webservice.db_models import ServersCreate, Templates
 from server_manager.webservice.interface.interface import ControllerContainerInterface
 from server_manager.webservice.logger import sm_logger
-
+from server_manager.webservice.util.data_access import DB
 # Default namespace for game servers
 DEFAULT_NAMESPACE = "game-servers"
 
@@ -265,7 +265,10 @@ class KubernetesContainerAPI(ControllerContainerInterface):
         """Create a new GameServer custom resource from server and template configuration."""
         try:
             custom_api = self._get_custom_objects_api()
-
+            user = DB().get_user(tenant_id)
+            if not user:
+                sm_logger.error(f"User with ID {tenant_id} not found for server {server.name}")
+                return False
             # Build the GameServer custom resource
             gameserver_manifest: dict[str, Any] = {
                 "apiVersion": f"{CRD_GROUP}/{CRD_VERSION}",
@@ -285,7 +288,7 @@ class KubernetesContainerAPI(ControllerContainerInterface):
                     "templateName": template.name,
                     "nodeName": str(server.node_id) if server.node_id else None,
                     "tenantId": tenant_id,  # Using users[0] as tenant association
-                    "tenantName": server.name,
+                    "tenantName": user.username,
                     "env": server.env or {},
                     "cpu": server.cpu or template.resource_min_cpu or 1,
                     "memory": server.memory or template.resource_min_mem or 1,

@@ -33,10 +33,31 @@ class UsersReadQL:
 class Context(BaseContext):
     @cached_property
     def user(self) -> UsersReadQL | None:
-        if not self.request:
-            return None
+        authorization = None
 
-        authorization = self.request.headers.get("Authorization", None)
+        sm_logger.debug("Authenticating user from context.")
+        
+        # Check HTTP headers first (for queries/mutations)
+        if self.request:
+            authorization = self.request.headers.get("Authorization", None)
+        sm_logger.debug(f"Authorization header: {authorization}")
+        sm_logger.debug(f"Connection params: {self.connection_params}")
+        
+        # Check WebSocket connection params (for subscriptions)
+        if not authorization and self.connection_params:
+            # Try common key variations for authorization in connection params
+            authorization = (
+                self.connection_params.get("Authorization") or
+                self.connection_params.get("authorization") or
+                self.connection_params.get("authToken") or
+                self.connection_params.get("token")
+            )
+            # Handle nested headers structure: { headers: { Authorization: "..." } }
+            if not authorization and isinstance(self.connection_params.get("headers"), dict):
+                headers = self.connection_params["headers"]
+                authorization = headers.get("Authorization") or headers.get("authorization")
+            sm_logger.debug(f"Authorization from connection_params: {authorization}")
+        
         if not authorization:
             return None
         
