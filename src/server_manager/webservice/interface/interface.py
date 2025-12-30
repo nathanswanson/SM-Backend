@@ -30,23 +30,23 @@ class ControllerImageInterface:
 
 class ControllerVolumeInterface:
     @abstractmethod
-    async def list_directory(self, container_name: str, namespace: str, path: str) -> DirList | None:
+    async def list_directory(self, deployment_name: str, namespace: str, path: str, username: str) -> DirList | None:
         pass
 
     @abstractmethod
-    async def read_file(self, container_name: str, namespace: str, path: str) -> AsyncGenerator:
+    async def read_file(self, deployment_name: str, namespace: str, path: str, username: str) -> AsyncGenerator:
         pass
 
     @abstractmethod
-    async def read_archive(self, container_name: str, namespace: str, path: str) -> AsyncGenerator:
+    async def read_archive(self, deployment_name: str, namespace: str, path: str, username: str) -> AsyncGenerator:
         pass
 
     @abstractmethod
-    async def write_file(self, container_name: str, namespace: str, path: str, data: bytes) -> bool:
+    async def write_file(self, deployment_name: str, namespace: str, path: str, data: bytes, username: str) -> bool:
         pass
 
     @abstractmethod
-    async def delete_file(self, container_name: str, namespace: str, path: str) -> bool:
+    async def delete_file(self, deployment_name: str, namespace: str, path: str, username: str) -> bool:
         pass
 
 
@@ -56,31 +56,31 @@ class ControllerContainerInterface(metaclass=ABCMeta):
         pass
 
     @abstractmethod
-    async def start(self, container_name: str, namespace: str) -> bool:
+    async def start(self, deployment_name: str, namespace: str) -> bool:
         pass
 
     @abstractmethod
-    async def stop(self, container_name: str, namespace: str) -> bool:
+    async def stop(self, deployment_name: str, namespace: str) -> bool:
         pass
 
     @abstractmethod
-    async def remove(self, container_name: str, namespace: str) -> bool:
+    async def remove(self, deployment_name: str, namespace: str) -> bool:
         pass
 
     @abstractmethod
-    async def exists(self, container_name: str, namespace: str) -> bool:
+    async def exists(self, deployment_name: str, namespace: str) -> bool:
         pass
 
     @abstractmethod
-    async def is_running(self, container_name: str, namespace: str) -> bool:
+    async def is_running(self, deployment_name: str, namespace: str) -> bool:
         pass
 
     @abstractmethod
-    async def health_status(self, container_name: str, namespace: str) -> str | None:
+    async def health_status(self, deployment_name: str, namespace: str) -> str | None:
         pass
 
     @abstractmethod
-    async def command(self, container_name: str, command: str, namespace: str) -> bool:
+    async def command(self, deployment_name: str, command: str, namespace: str) -> bool:
         pass
 
 
@@ -89,12 +89,12 @@ class ControllerStreamingInterface(metaclass=ABCMeta):
 
     @abstractmethod
     def stream_logs(
-        self, container_name: str, namespace: str, tail: int = 100, follow: bool = True
+        self, deployment_name: str, namespace: str, tail: int = 100, follow: bool = True
     ) -> AsyncGenerator[str, None]:
         """Stream logs from a container.
 
         Args:
-            container_name: Name of the container/pod
+            deployment_name: Name of the container/pod
             namespace: Namespace of the container
             tail: Number of historical lines to fetch
             follow: Whether to follow new logs
@@ -105,11 +105,11 @@ class ControllerStreamingInterface(metaclass=ABCMeta):
         ...
 
     @abstractmethod
-    def stream_metrics(self, container_name: str, namespace: str) -> AsyncGenerator[Metrics, None]:
+    def stream_metrics(self, deployment_name: str, namespace: str) -> AsyncGenerator[Metrics, None]:
         """Stream metrics from a container.
 
         Args:
-            container_name: Name of the container/pod
+            deployment_name: Name of the container/pod
             namespace: Namespace of the container
 
         Yields:

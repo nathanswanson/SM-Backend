@@ -1,10 +1,11 @@
+import base64
 import io
 import os
 import stat
 import tarfile
 from collections.abc import AsyncGenerator, Generator
 from contextlib import contextmanager
-from typing import Any, cast, override
+from typing import Any, override
 
 from fabric import Connection
 from kubernetes import client, config
@@ -14,7 +15,7 @@ from paramiko import SFTPClient
 from server_manager.webservice.interface.interface import ControllerVolumeInterface, DirList
 from server_manager.webservice.logger import sm_logger
 
-# Default namespace for game servers
+# Default namespace for game servers crds
 DEFAULT_NAMESPACE = "game-servers"
 
 # Custom Resource Definition details for GameServer
@@ -22,10 +23,6 @@ CRD_GROUP = "server-manager.io"
 CRD_VERSION = "v1alpha1"
 CRD_PLURAL = "gameservers"
 
-# SFTP configuration
-SFTP_PORT = 22
-SFTP_USER = os.environ.get("SM_SFTP_USER", "gameserver")
-SFTP_KEY_PATH = os.environ.get("SM_SFTP_KEY_PATH", "/app/secrets/sftp_key")
 
 # Chunk size for streaming file operations
 CHUNK_SIZE = 64 * 1024  # 64KB
@@ -64,57 +61,8 @@ class KubernetesVolumeAPI(ControllerVolumeInterface):
         """Get the CoreV1Api client for pod operations."""
         return client.CoreV1Api()
 
-    async def _get_service_ip(self, container_name: str, namespace: str) -> str | None:
-        """Get the service IP for a game server from its CRD status.
-
-        Args:
-            container_name: Name of the game server
-            namespace: Kubernetes namespace
-
-        Returns:
-            The service IP if available, None otherwise
-        """
-        try:
-            custom_api = self._get_custom_objects_api()
-            gameserver = custom_api.get_namespaced_custom_object(
-                group=CRD_GROUP,
-                version=CRD_VERSION,
-                namespace=namespace or DEFAULT_NAMESPACE,
-                plural=CRD_PLURAL,
-                name=container_name,
-            )
-            gameserver_dict = cast(dict[str, Any], gameserver)
-            status = gameserver_dict.get("status", {})
-            return status.get("serviceIP")
-        except ApiException as e:
-            sm_logger.error(f"Failed to get service IP for {container_name}: {e}")
-            return None
-
-    async def _get_pod_ip(self, container_name: str, namespace: str) -> str | None:
-        """Fallback: Get pod IP directly if service IP is not available.
-
-        Args:
-            container_name: Name of the game server
-            namespace: Kubernetes namespace
-
-        Returns:
-            The pod IP if available, None otherwise
-        """
-        try:
-            core_api = self._get_core_api()
-            pods = core_api.list_namespaced_pod(
-                namespace=namespace or DEFAULT_NAMESPACE,
-                label_selector=f"app={container_name}",
-            )
-            if pods.items:
-                return pods.items[0].status.pod_ip
-            return None
-        except ApiException as e:
-            sm_logger.error(f"Failed to get pod IP for {container_name}: {e}")
-            return None
-
     @contextmanager
-    def _get_sftp_connection(self, host: str) -> Generator[SFTPClient, None, None]:
+    def _get_sftp_connection(self, host: str, user: str, password: str, port: int) -> Generator[SFTPClient, None, None]:
         """Create an SFTP connection to the specified host.
 
         Args:
@@ -127,21 +75,12 @@ class KubernetesVolumeAPI(ControllerVolumeInterface):
             ConnectionError: If unable to establish SFTP connection
         """
         connect_kwargs: dict[str, Any] = {}
-
-        # Use key-based authentication if key file exists
-        if os.path.exists(SFTP_KEY_PATH):
-            connect_kwargs["key_filename"] = SFTP_KEY_PATH
-        else:
-            # Fall back to password from environment (for development)
-            password = os.environ.get("SM_SFTP_PASSWORD")
-            if password:
-                connect_kwargs["password"] = password
-
+        connect_kwargs["password"] = password
         try:
             conn = Connection(
                 host=host,
-                user=SFTP_USER,
-                port=SFTP_PORT,
+                user=user,
+                port=port,
                 connect_kwargs=connect_kwargs,
             )
             sftp = conn.sftp()
@@ -155,42 +94,91 @@ class KubernetesVolumeAPI(ControllerVolumeInterface):
             msg = f"SFTP connection failed: {e}"
             raise ConnectionError(msg) from e
 
-    async def _get_host(self, container_name: str, namespace: str) -> str | None:
+    async def _get_host(self, deployment_name: str, namespace: str) -> str | None:
         """Get the host IP for SFTP connection.
 
         Tries service IP first, falls back to pod IP.
 
         Args:
-            container_name: Name of the game server
+            deployment_name: Name of the game server
             namespace: Kubernetes namespace
 
         Returns:
             The host IP if available, None otherwise
         """
-        host = await self._get_service_ip(container_name, namespace)
-        if not host:
-            host = await self._get_pod_ip(container_name, namespace)
-        return host
+        core_api = self._get_core_api()
+        service_name = f"{deployment_name}-svc"
+        try:
+            service = core_api.read_namespaced_service(name=service_name, namespace=namespace)
+            cluster_ip = service.spec.cluster_ip
+            if cluster_ip and cluster_ip != "None":
+                return cluster_ip
+        except ApiException as e:
+            sm_logger.error(f"Failed to get service {service_name} in namespace {namespace}: {e}")
+        return None
+
+    async def _get_port(self, deployment_name: str, namespace: str) -> int | None:
+        """Get the port for SFTP connection from the service.
+
+        Args:
+            deployment_name: Name of the game server
+            namespace: Kubernetes namespace
+        Returns:
+            The port if available, None otherwise
+        """
+        core_api = self._get_core_api()
+        service_name = f"{deployment_name}-svc"
+        try:
+            service = core_api.read_namespaced_service(name=service_name, namespace=namespace)
+            ports = service.spec.ports or []
+            for port in ports:
+                if port.name == "sftp":
+                    return port.port
+        except ApiException as e:
+            sm_logger.error(f"Failed to get service {service_name} in namespace {namespace}: {e}")
+        return None
+
+    def _get_password_from_secret(self, server_name: str, namespace: str) -> str:
+        """Retrieve the SFTP password from Kubernetes secret.
+
+        Args:
+            namespace: Kubernetes namespace
+
+        """
+        core_api = self._get_core_api()
+        secret_name = f"{server_name}-sftp-secret"
+        try:
+            secret = core_api.read_namespaced_secret(name=secret_name, namespace=namespace)
+            password_b64 = secret.data.get("password")
+            if not password_b64:
+                msg = "Password not found in secret"
+                raise ValueError(msg)
+            return base64.b64decode(password_b64).decode("utf-8")
+        except ApiException as e:
+            sm_logger.error(f"Failed to retrieve secret {secret_name} in namespace {namespace}: {e}")
+            raise
 
     @override
-    async def list_directory(self, container_name: str, namespace: str, path: str) -> DirList | None:
+    async def list_directory(self, deployment_name: str, namespace: str, path: str, username: str) -> DirList | None:
         """List files and directories at the specified path.
 
         Args:
-            container_name: Name of the game server
+            deployment_name: Name of the game server
             namespace: Kubernetes namespace
             path: Path to list
 
         Returns:
             Tuple of (directories, files) or None if failed
         """
-        host = await self._get_host(container_name, namespace)
+        host = await self._get_host(deployment_name, namespace)
         if not host:
-            sm_logger.error(f"No host available for {container_name}")
+            sm_logger.error(f"No host available for {deployment_name}")
             return None
 
         try:
-            with self._get_sftp_connection(host) as sftp:
+            password = self._get_password_from_secret(deployment_name, namespace)
+            port = await self._get_port(deployment_name, namespace)
+            with self._get_sftp_connection(host, user=username, password=password, port=port) as sftp:
                 entries = sftp.listdir_attr(path)
 
                 directories: list[str] = []
@@ -199,24 +187,24 @@ class KubernetesVolumeAPI(ControllerVolumeInterface):
                 for entry in entries:
                     entry_mode = entry.st_mode or 0
                     if stat.S_ISDIR(entry_mode):
-                        directories.append(entry.filename)
+                        directories.append(entry.filename + "/")
                     else:
                         files.append(entry.filename)
 
                 return (directories, files)
         except FileNotFoundError:
-            sm_logger.warning(f"Directory not found: {path} on {container_name}")
+            sm_logger.warning(f"Directory not found: {path} on {deployment_name}")
             return None
         except Exception as e:
-            sm_logger.error(f"Failed to list directory {path} on {container_name}: {e}")
+            sm_logger.error(f"Failed to list directory {path} on {deployment_name}: {e}")
             return None
 
     @override
-    async def read_file(self, container_name: str, namespace: str, path: str) -> AsyncGenerator:
+    async def read_file(self, deployment_name: str, namespace: str, path: str, username: str) -> AsyncGenerator:
         """Read a file from the game server and stream its contents.
 
         Args:
-            container_name: Name of the game server
+            deployment_name: Name of the game server
             namespace: Kubernetes namespace
             path: Path to the file to read
 
@@ -225,31 +213,37 @@ class KubernetesVolumeAPI(ControllerVolumeInterface):
         """
 
         async def _generator() -> AsyncGenerator:
-            host = await self._get_host(container_name, namespace)
+            host = await self._get_host(deployment_name, namespace)
             if not host:
-                sm_logger.error(f"No host available for {container_name}")
+                sm_logger.error(f"No host available for {deployment_name}")
                 return
 
             try:
-                with self._get_sftp_connection(host) as sftp, sftp.open(path, "rb") as remote_file:
+                password = self._get_password_from_secret(deployment_name, namespace)
+                port = await self._get_port(deployment_name, namespace)
+                with (
+                    self._get_sftp_connection(host, user=username, password=password, port=port) as sftp,
+                    sftp.open(path, "rb") as remote_file,
+                ):
+                    yield remote_file.stat().st_size.to_bytes(8, "big")  # Send file size first
                     while True:
                         chunk = remote_file.read(CHUNK_SIZE)
                         if not chunk:
                             break
                         yield chunk
             except FileNotFoundError:
-                sm_logger.warning(f"File not found: {path} on {container_name}")
+                sm_logger.warning(f"File not found: {path} on {deployment_name}")
             except Exception as e:
-                sm_logger.error(f"Failed to read file {path} on {container_name}: {e}")
+                sm_logger.error(f"Failed to read file {path} on {deployment_name}: {e}")
 
         return _generator()
 
     @override
-    async def read_archive(self, container_name: str, namespace: str, path: str) -> AsyncGenerator:
+    async def read_archive(self, deployment_name: str, namespace: str, path: str, username: str) -> AsyncGenerator:
         """Read a directory as a tar archive and stream its contents.
 
         Args:
-            container_name: Name of the game server
+            deployment_name: Name of the game server
             namespace: Kubernetes namespace
             path: Path to the directory to archive
 
@@ -258,13 +252,15 @@ class KubernetesVolumeAPI(ControllerVolumeInterface):
         """
 
         async def _generator() -> AsyncGenerator:
-            host = await self._get_host(container_name, namespace)
+            host = await self._get_host(deployment_name, namespace)
             if not host:
-                sm_logger.error(f"No host available for {container_name}")
+                sm_logger.error(f"No host available for {deployment_name}")
                 return
 
             try:
-                with self._get_sftp_connection(host) as sftp:
+                password = self._get_password_from_secret(deployment_name, namespace)
+                port = await self._get_port(deployment_name, namespace)
+                with self._get_sftp_connection(host, user=username, password=password, port=port) as sftp:
                     # Create an in-memory tar archive
                     buffer = io.BytesIO()
 
@@ -279,9 +275,9 @@ class KubernetesVolumeAPI(ControllerVolumeInterface):
                             break
                         yield chunk
             except FileNotFoundError:
-                sm_logger.warning(f"Path not found: {path} on {container_name}")
+                sm_logger.warning(f"Path not found: {path} on {deployment_name}")
             except Exception as e:
-                sm_logger.error(f"Failed to create archive of {path} on {container_name}: {e}")
+                sm_logger.error(f"Failed to create archive of {path} on {deployment_name}: {e}")
 
         return _generator()
 
@@ -326,11 +322,11 @@ class KubernetesVolumeAPI(ControllerVolumeInterface):
             sm_logger.warning(f"Failed to add {remote_path} to archive: {e}")
 
     @override
-    async def write_file(self, container_name: str, namespace: str, path: str, data: bytes) -> bool:
+    async def write_file(self, deployment_name: str, namespace: str, path: str, data: bytes, username: str) -> bool:
         """Write data to a file on the game server.
 
         Args:
-            container_name: Name of the game server
+            deployment_name: Name of the game server
             namespace: Kubernetes namespace
             path: Path to write the file to
             data: File contents as bytes
@@ -338,13 +334,15 @@ class KubernetesVolumeAPI(ControllerVolumeInterface):
         Returns:
             True if successful, False otherwise
         """
-        host = await self._get_host(container_name, namespace)
+        host = await self._get_host(deployment_name, namespace)
         if not host:
-            sm_logger.error(f"No host available for {container_name}")
+            sm_logger.error(f"No host available for {deployment_name}")
             return False
 
         try:
-            with self._get_sftp_connection(host) as sftp:
+            password = self._get_password_from_secret(deployment_name, namespace)
+            port = await self._get_port(deployment_name, namespace)
+            with self._get_sftp_connection(host, user=username, password=password, port=port) as sftp:
                 # Ensure parent directory exists
                 parent_dir = os.path.dirname(path)
                 if parent_dir:
@@ -358,10 +356,10 @@ class KubernetesVolumeAPI(ControllerVolumeInterface):
                 with sftp.open(path, "wb") as remote_file:
                     remote_file.write(data)
 
-                sm_logger.info(f"Wrote {len(data)} bytes to {path} on {container_name}")
+                sm_logger.info(f"Wrote {len(data)} bytes to {path} on {deployment_name}")
                 return True
         except Exception as e:
-            sm_logger.error(f"Failed to write file {path} on {container_name}: {e}")
+            sm_logger.error(f"Failed to write file {path} on {deployment_name}: {e}")
             return False
 
     def _mkdir_p(self, sftp: SFTPClient, remote_path: str) -> None:
@@ -384,24 +382,26 @@ class KubernetesVolumeAPI(ControllerVolumeInterface):
             sftp.mkdir(remote_path)
 
     @override
-    async def delete_file(self, container_name: str, namespace: str, path: str) -> bool:
+    async def delete_file(self, deployment_name: str, namespace: str, path: str, username: str) -> bool:
         """Delete a file or directory on the game server.
 
         Args:
-            container_name: Name of the game server
+            deployment_name: Name of the game server
             namespace: Kubernetes namespace
             path: Path to delete
 
         Returns:
             True if successful, False otherwise
         """
-        host = await self._get_host(container_name, namespace)
+        host = await self._get_host(deployment_name, namespace)
         if not host:
-            sm_logger.error(f"No host available for {container_name}")
+            sm_logger.error(f"No host available for {deployment_name}")
             return False
 
         try:
-            with self._get_sftp_connection(host) as sftp:
+            password = self._get_password_from_secret(deployment_name, namespace)
+            port = await self._get_port(deployment_name, namespace)
+            with self._get_sftp_connection(host, user=username, password=password, port=port) as sftp:
                 file_stat = sftp.stat(path)
                 mode = file_stat.st_mode or 0
 
@@ -411,13 +411,13 @@ class KubernetesVolumeAPI(ControllerVolumeInterface):
                 else:
                     sftp.remove(path)
 
-                sm_logger.info(f"Deleted {path} on {container_name}")
+                sm_logger.info(f"Deleted {path} on {deployment_name}")
                 return True
         except FileNotFoundError:
-            sm_logger.warning(f"Path not found for deletion: {path} on {container_name}")
+            sm_logger.warning(f"Path not found for deletion: {path} on {deployment_name}")
             return True  # Already deleted
         except Exception as e:
-            sm_logger.error(f"Failed to delete {path} on {container_name}: {e}")
+            sm_logger.error(f"Failed to delete {path} on {deployment_name}: {e}")
             return False
 
     async def _rmdir_recursive(self, sftp: SFTPClient, path: str) -> None:
