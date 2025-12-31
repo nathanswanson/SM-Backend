@@ -59,9 +59,11 @@ LOG_CONFIG = {
             "propagate": False,
         },
         "sqlalchemy.engine": {"handlers": ["sqlalchemy"], "level": "NOTSET", "propagate": False},
-        "uvicorn.asgi": {"handlers": ["default"], "level": "NOTSET", "propagate": False},
-        "uvicorn.error": {"handlers": ["default"], "level": "NOTSET", "propagate": False},
-        "uvicorn.access": {"handlers": ["default"], "level": "NOTSET", "propagate": False},
+        "uvicorn.asgi": {"handlers": ["default"], "level": "INFO", "propagate": False},
+        "uvicorn.error": {"handlers": ["default"], "level": "INFO", "propagate": False},
+        "uvicorn.access": {"handlers": ["default"], "level": "INFO", "propagate": False},
+        # fabcric/paramkio
+        "paramiko": {"handlers": ["default"], "level": "WARNING", "propagate": False},
     },
 }
 

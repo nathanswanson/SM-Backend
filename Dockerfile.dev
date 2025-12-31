@@ -1,16 +1,28 @@
-
 FROM ubuntu:25.04
 
 WORKDIR /app
 
+# Install system dependencies 
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    python3 \
+    python3-pip \
+    python3-debugpy \
+    make && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-RUN apt-get update && apt-get install -y python3 python3-pip python3-debugpy make
-
-RUN pip install hatch --break-system-packages
+# Install hatch
+RUN pip install --no-cache-dir hatch --break-system-packages
 
 COPY pyproject.toml README.md ./
 COPY src/server_manager/__about__.py /app/src/server_manager/__about__.py
 
-COPY . .
+# Create hatch environment
 RUN hatch env create
+
+# Copy the rest of the application
+COPY . .
+
+# Install the application in editable mode
 RUN hatch run pip install -e .

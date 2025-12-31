@@ -4,7 +4,7 @@ import aiodocker
 import pytest
 from fastapi import HTTPException
 
-from server_manager.webservice.interface.docker import docker_container_api as api
+from server_manager.webservice.interface.docker_api import docker_container_api as api
 
 
 @pytest.fixture
@@ -280,7 +280,7 @@ async def test_container_inspect_returns_data(mocker, async_cm_factory):
         return_value=async_cm_factory(container),
     )
 
-    result = await api.docker_container_inspect("mc")
+    result = await api._docker_container_inspect("mc")
 
     assert isinstance(result, api.HealthInfo)
     assert result.output == "bad"
@@ -295,7 +295,7 @@ async def test_container_inspect_raises_when_not_running(mocker):
     )
 
     with pytest.raises(HTTPException) as exc:
-        await api.docker_container_inspect("mc")
+        await api._docker_container_inspect("mc")
 
     assert exc.value.status_code == 400
 
@@ -314,7 +314,7 @@ async def test_container_inspect_returns_none_without_health(mocker, async_cm_fa
         return_value=async_cm_factory(container),
     )
 
-    assert await api.docker_container_inspect("mc") is None
+    assert await api._docker_container_inspect("mc") is None
 
 
 @pytest.mark.asyncio

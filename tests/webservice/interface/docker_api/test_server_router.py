@@ -6,7 +6,7 @@ import requests
 from pytest_mock import MockerFixture
 
 from server_manager.webservice.db_models import ServersRead, TemplatesRead
-from server_manager.webservice.net.server_router import ServerRouter
+from server_manager.webservice.interface.docker_api.server_router import ServerRouter
 from tests.mock_data import TEST_SERVER_READ, TEST_TEMPLATE_READ
 
 
@@ -145,7 +145,7 @@ def test_server_router_init(mocker: MockerFixture):
     """Test that the ServerRouter __init__ calls requests.post."""
     mock_post = mocker.patch("requests.post")
     # Reset singleton for this test to ensure __init__ is called
-    ServerRouter._instances = {}  # noqa: SLF001 requires-low-code-change
+    ServerRouter._instances = {}
     ServerRouter()
     mock_post.assert_called_once_with("http://rproxy:2019/config/apps/layer4/servers", json={}, timeout=5)
 

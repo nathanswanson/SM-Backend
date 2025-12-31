@@ -1,4 +1,5 @@
 # Volume
+
 import ast
 import io
 import os
@@ -6,31 +7,44 @@ import tarfile
 import zipfile
 from typing import Annotated
 
-from fastapi import APIRouter, HTTPException, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 
-from server_manager.webservice.interface.docker.docker_volume_api import (
-    docker_delete_file,
-    docker_file_upload,
-    docker_read_file,
-    docker_read_tarfile,
-)
-from server_manager.webservice.models import (
-    ContainerFileDeleteResponse,
-    ContainerFileUploadResponse,
-)
-from server_manager.webservice.util.data_access import DB
+from server_manager.webservice.interface.interface import ControllerVolumeInterface
+from server_manager.webservice.interface.interface_manager import get_volume_client
+from server_manager.webservice.models import ContainerFileDeleteResponse, ContainerFileUploadResponse
+from server_manager.webservice.util.data_access import DB, get_db
 
 router = APIRouter()
 
 
+def _normalize_path(path: str) -> str:
+    # path must not have leading slash, no .. components, and use / as separator, no double slashes
+    parts = []
+    for part in path.split("/"):
+        if part in {"", "."}:
+            continue
+        if part == "..":
+            if parts:
+                parts.pop()
+        else:
+            parts.append(part)
+    return "/".join(parts)
+
+
 @router.get("/{server_id}/fs/archive")
-async def get_archive(server_id: int, paths: str | None = None):
+async def get_archive(
+    server_id: int,
+    client: Annotated[ControllerVolumeInterface, Depends(get_volume_client)],
+    db: Annotated[DB, Depends(get_db)],
+    paths: str | None = None,
+):
+    paths = "/" + paths.lstrip("/")
     actual_paths = ast.literal_eval(paths) if paths else None
-    server = DB().get_server(server_id)
+    server = db.get_server(server_id)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
-    exposed_volume = DB().get_template(server.template_id).exposed_volume  # type: ignore
+    exposed_volume = db.get_template(server.template_id).exposed_volume  # type: ignore
     if not exposed_volume:
         raise HTTPException(status_code=400, detail="No exposed volumes for this server")
     exposed_volume = set(exposed_volume)
@@ -48,9 +62,11 @@ async def get_archive(server_id: int, paths: str | None = None):
     tar_bytes = io.BytesIO()
     with tarfile.open(fileobj=tar_bytes, mode="w|gz") as tar_file:
         for path in actual_paths:
-            with await docker_read_tarfile(container_name=server.container_name, path=path) as docker_reader:
-                for member in docker_reader.getmembers():
-                    file_obj = docker_reader.extractfile(member)
+            with await client.read_archive(
+                deployment_name=server.container_name, namespace=f"tenant-{server.linked_users[0].id}", path=path
+            ) as reader:
+                for member in reader.getmembers():
+                    file_obj = reader.extractfile(member)
                     if file_obj:
                         tar_file.addfile(member, fileobj=file_obj)
     tar_bytes.seek(0)
@@ -61,13 +77,26 @@ async def get_archive(server_id: int, paths: str | None = None):
 
 
 @router.get("/{server_id}/fs")
-async def read_file(server_id: int, path: str):
+async def read_file(
+    server_id: int,
+    path: Annotated[str, Query(description="Absolute path to file")],  # Already uses query
+    client: Annotated[ControllerVolumeInterface, Depends(get_volume_client)],
+    db: Annotated[DB, Depends(get_db)],
+):
     """read a file in a container volume, returns a tar archive of the file"""
-    server = DB().get_server(server_id)  # verify server exists
+    server = db.get_server(server_id)  # verify server exists
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
 
-    gen = docker_read_file(container_name=server.container_name, path=path)
+    path = "/" + path.lstrip("/")
+
+    gen = await client.read_file(
+        deployment_name=server.container_name,
+        namespace=f"tenant-{server.linked_users[0].id}",
+        path=path,
+        username=server.linked_users[0].username,
+    )
+
     archive_size = await anext(gen)
     archive_size = int.from_bytes(archive_size, "big")
     if not archive_size:
@@ -104,30 +133,54 @@ async def raw_handler(file: UploadFile, name: str, tar: tarfile.TarFile):
     tar.addfile(info, fileobj=file.file)
 
 
-@router.post("/{server_id}/fs/", response_model=ContainerFileUploadResponse)
-async def upload_file(request: Request, server_id: int, path: Annotated[str, Query()]) -> ContainerFileUploadResponse:
-    """upload a zip file to a container volume path, extracts zip and places contents in path"""
-    server = DB().get_server(server_id)  # verify server exists
+@router.post(
+    "/{server_id}/fs/",
+    openapi_extra={
+        "requestBody": {
+            "content": {"application/octet-stream": {"schema": {"type": "string", "format": "binary"}}},
+            "required": True,
+        }
+    },
+    response_model=ContainerFileUploadResponse,
+)
+async def upload_file(
+    request: Request,
+    server_id: int,
+    path: Annotated[str, Query()],
+    client: Annotated[ControllerVolumeInterface, Depends(get_volume_client)],
+    db: Annotated[DB, Depends(get_db)],
+) -> ContainerFileUploadResponse:
+    """upload a file to a container volume path"""
+    path = "/" + path.lstrip("/")
+    server = db.get_server(server_id)
     if not server:
         raise HTTPException(status_code=404, detail="Server not found")
     data = bytearray()
-    # currently this requires the entire file to be read into memory
     async for chunk in request.stream():
         data.extend(chunk)
-    tar_bytes = io.BytesIO()
-    with tarfile.open(mode="w", fileobj=tar_bytes) as tmp_tar:
-        tar_info = tarfile.TarInfo(name=os.path.basename(path))
-        tar_info.size = len(data)
-        tmp_tar.addfile(tar_info, io.BytesIO(data))
-    ret = await docker_file_upload(
-        container_name=server.container_name, path=os.path.dirname(path), data=tar_bytes.getvalue()
+
+    ret = await client.write_file(
+        deployment_name=server.container_name,
+        path=path,
+        data=bytes(data),
+        namespace=f"tenant-{server.linked_users[0].id}",
+        username=server.linked_users[0].username,
     )
-    tar_bytes.close()
     return ContainerFileUploadResponse(success=ret)
 
 
-@router.delete("/{server_id}/fs/{path}", response_model=ContainerFileDeleteResponse)
-async def delete_file(container_name: str, path: str):
+@router.delete("/{server_id}/fs")  # Change from path param
+async def delete_file(
+    server_id: int,
+    path: Annotated[str, Query(description="Absolute path to file")],
+    client: Annotated[ControllerVolumeInterface, Depends(get_volume_client)],
+    db: Annotated[DB, Depends(get_db)],
+) -> ContainerFileDeleteResponse:
     """delete a file in a container volume"""
-    ret = await docker_delete_file(container_name, path)
+    server = db.get_server(server_id)
+    if not server:
+        raise HTTPException(status_code=404, detail="Server not found")
+    ret = await client.delete_file(
+        server.container_name, f"tenant-{server.linked_users[0].id}", path, server.linked_users[0].username
+    )
     return ContainerFileDeleteResponse(success=ret)

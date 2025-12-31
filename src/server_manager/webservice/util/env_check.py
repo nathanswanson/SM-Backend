@@ -9,6 +9,7 @@ from server_manager.webservice.logger import sm_logger
 
 
 def startup_info():
+    sm_logger.info("Performing environment checks...")
     sm_logger.log_group(
         "Starting server-manager webservice",
         [
@@ -19,7 +20,7 @@ def startup_info():
             f"Log Path: {os.environ.get('SM_LOG_PATH', 'stdout')} (SM_LOG_PATH)",
             f"Environment: {os.environ.get('SM_ENV', 'PROD')} (SM_ENV)",
             f"Port Range: {os.environ.get('SM_PORT_START', '30000')}-{os.environ.get('SM_PORT_END', '30100')} (SM_PORT_START and SM_PORT_END)",
-            f"Static Path: {os.environ.get('SM_STATIC_PATH', 'NULL')} (SM_STATIC_PATH)",
+            f"Kubernetes: {'Enabled' if os.environ.get('SM_K8S') == '1' else 'Disabled'} (SM_K8S)",
             f"URL: {Fore.BLUE}{'https' if os.environ.get('SM_ENV') != 'DEV' else 'http'}://{os.environ.get('SM_API_BACKEND', 'localhost')}{Fore.RESET} (SM_API_BACKEND)",
         ],
     )

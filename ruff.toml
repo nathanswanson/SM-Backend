@@ -55,7 +55,7 @@ select = [
   "B035",
   "B904",
   "B905",
-  "BLE001",
+
   "C400",
   "C401",
   "C402",
@@ -360,7 +360,6 @@ select = [
   "RUF100",
   "S102",
   "S103",
-  "S104",
   "S105",
   "S106",
   "S107",
@@ -463,7 +462,6 @@ select = [
   "TRY004",
   "TRY201",
   "TRY203",
-  "TRY300",
   "TRY400",
   "TRY401",
   "UP001",
@@ -532,6 +530,7 @@ select = [
   "ARG001",
   "ARG005",
 ]
+"**/__init__.py" = ["E402", "F401"]
 
 [lint.flake8-tidy-imports]
 ban-relative-imports = "all"

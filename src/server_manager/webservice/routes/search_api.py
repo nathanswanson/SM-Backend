@@ -4,8 +4,8 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException
 
 from server_manager.webservice.db_models import Users
-from server_manager.webservice.interface.docker.docker_container_api import docker_container_running
-from server_manager.webservice.interface.docker.docker_volume_api import docker_list_directory
+from server_manager.webservice.interface.interface import ControllerVolumeInterface
+from server_manager.webservice.interface.interface_manager import get_volume_client
 from server_manager.webservice.models import (
     NodeListResponse,
     ServerFileListResponse,
@@ -38,17 +38,18 @@ def search_servers(current_user: Annotated[Users, Depends(auth_get_active_user)]
 @router.get("/fs/{server_id}/{path:path}", response_model=ServerFileListResponse)
 async def search_fs(
     server_id: int,
-    current_user: Annotated[Users, Depends(auth_get_active_user)],  # noqa: ARG001
+    current_user: Annotated[Users, Depends(auth_get_active_user)],
+    client: Annotated[ControllerVolumeInterface, Depends(get_volume_client)],
     db: Annotated[DB, Depends(get_db)],
     path: str = "",
 ):
     """Search for files in a container's filesystem"""
+    # Normalize to absolute path
+    path = "/" + path.lstrip("/")
     server = db.get_server(server_id)
     if server is None:
         raise HTTPException(status_code=404, detail="Server not found")
-    if not await docker_container_running(server.container_name):
-        raise HTTPException(status_code=400, detail="Container is not running")
-    ret = await docker_list_directory(server.container_name, path)
+    ret = await client.list_directory(server.container_name, f"tenant-{current_user.id}", path, current_user.username)
     if ret is None:
         raise HTTPException(status_code=404, detail="Container not found or path invalid")
     # remove all non relevant paths
@@ -57,11 +58,12 @@ async def search_fs(
         raise HTTPException(status_code=500, detail="Template not found for server: " + server.name)
     accessible_paths: list[str] = template.exposed_volume or []
     paths = []
-    for relative_path in ret[0] + [f"{folder}/" for folder in ret[1]]:
+    directories, files = ret
+    for relative_path in directories + files:  # directories already have /, files don't
         full_path = os.path.join(path, relative_path)
         for accessible_path in accessible_paths:
             if full_path.startswith(accessible_path):
-                paths.append(relative_path)
+                paths.append(full_path)
                 break
     return ServerFileListResponse(items=paths)
 

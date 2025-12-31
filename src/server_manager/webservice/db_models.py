@@ -179,3 +179,4 @@ class ServersRead(ServersBase):
     node_id: int = Field(foreign_key="nodes.id")
     template_id: int = Field(foreign_key="templates.id")
     port: list[int]
+    linked_users: list[UsersRead] = []

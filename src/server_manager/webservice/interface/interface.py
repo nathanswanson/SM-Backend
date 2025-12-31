@@ -1,7 +1,10 @@
-from abc import abstractmethod
+from abc import ABCMeta, abstractmethod
 from collections.abc import AsyncGenerator
 
 from pydantic import BaseModel, ConfigDict, Field
+
+from server_manager.webservice.db_models import ServersCreate, Templates
+from server_manager.webservice.models import Metrics
 
 type DirList = tuple[list[str], list[str]]
 
@@ -16,96 +19,100 @@ class HealthInfo(BaseModel):
 
 
 class ControllerImageInterface:
-    @staticmethod
     @abstractmethod
-    def image_exposed_port(image_name: str) -> list[int] | None:
+    async def image_exposed_port(self, image_name: str) -> list[int] | None:
         pass
 
-    @staticmethod
     @abstractmethod
-    def image_exposed_volumes(image_name: str) -> list[str] | None:
+    async def image_exposed_volumes(self, image_name: str) -> list[str] | None:
         pass
 
 
 class ControllerVolumeInterface:
-    @staticmethod
     @abstractmethod
-    def list_directory(container_name: str, path: str) -> DirList | None:
+    async def list_directory(self, deployment_name: str, namespace: str, path: str, username: str) -> DirList | None:
         pass
 
-    @staticmethod
     @abstractmethod
-    def read_file(container_name: str, path: str) -> AsyncGenerator:
+    async def read_file(self, deployment_name: str, namespace: str, path: str, username: str) -> AsyncGenerator:
         pass
 
-    @staticmethod
     @abstractmethod
-    def read_archive(container_name: str, path: str) -> AsyncGenerator:
+    async def read_archive(self, deployment_name: str, namespace: str, path: str, username: str) -> AsyncGenerator:
         pass
 
-    @staticmethod
     @abstractmethod
-    def write_file(container_name: str, path: str, data: bytes) -> bool:
+    async def write_file(self, deployment_name: str, namespace: str, path: str, data: bytes, username: str) -> bool:
         pass
 
-    @staticmethod
     @abstractmethod
-    def delete_file(container_name: str, path: str) -> bool:
+    async def delete_file(self, deployment_name: str, namespace: str, path: str, username: str) -> bool:
         pass
 
 
-class ControllerContainerInterface:
-    @staticmethod
+class ControllerContainerInterface(metaclass=ABCMeta):
     @abstractmethod
-    def list_container_names() -> list[dict]:
+    async def create(self, server: ServersCreate, template: Templates, tenant_id: int) -> bool:
         pass
 
-    @staticmethod
     @abstractmethod
-    def get_container(container_name: str) -> dict | None:
+    async def start(self, deployment_name: str, namespace: str) -> bool:
         pass
 
-    @staticmethod
     @abstractmethod
-    def create_container(container_config: dict) -> dict:
+    async def stop(self, deployment_name: str, namespace: str) -> bool:
         pass
 
-    @staticmethod
     @abstractmethod
-    def start_container(container_name: str) -> bool:
+    async def remove(self, deployment_name: str, namespace: str) -> bool:
         pass
 
-    @staticmethod
     @abstractmethod
-    def stop_container(container_name: str) -> bool:
+    async def exists(self, deployment_name: str, namespace: str) -> bool:
         pass
 
-    @staticmethod
     @abstractmethod
-    def remove_container(container_name: str) -> bool:
+    async def is_running(self, deployment_name: str, namespace: str) -> bool:
         pass
 
-    @staticmethod
     @abstractmethod
-    def container_name_exists(container_name: str) -> bool:
+    async def health_status(self, deployment_name: str, namespace: str) -> str | None:
         pass
 
-    @staticmethod
     @abstractmethod
-    def container_running(container_name: str) -> bool:
+    async def command(self, deployment_name: str, command: str, namespace: str) -> bool:
         pass
 
-    @staticmethod
-    @abstractmethod
-    def container_health_status(container_name: str) -> str | None:
-        pass
 
-    @staticmethod
-    @abstractmethod
-    def container_inspect(container_name: str) -> dict | None:
-        pass
+class ControllerStreamingInterface(metaclass=ABCMeta):
+    """Interface for streaming logs and metrics from containers."""
 
-    @staticmethod
     @abstractmethod
-    def container_command(container_name: str, command: str) -> bool:
-        pass
+    def stream_logs(
+        self, deployment_name: str, namespace: str, tail: int = 100, follow: bool = True
+    ) -> AsyncGenerator[str, None]:
+        """Stream logs from a container.
+
+        Args:
+            deployment_name: Name of the container/pod
+            namespace: Namespace of the container
+            tail: Number of historical lines to fetch
+            follow: Whether to follow new logs
+
+        Yields:
+            Log lines as strings
+        """
+        ...
+
+    @abstractmethod
+    def stream_metrics(self, deployment_name: str, namespace: str) -> AsyncGenerator[Metrics, None]:
+        """Stream metrics from a container.
+
+        Args:
+            deployment_name: Name of the container/pod
+            namespace: Namespace of the container
+
+        Yields:
+            Metrics objects with cpu, memory, disk, network stats
+        """
+        ...
